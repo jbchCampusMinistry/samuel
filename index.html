@@ -246,6 +246,32 @@
     [data-theme="dark"] .hp-overall { color: #aeb8c4; }
     [data-theme="dark"] .hp-num { color: #aeb8c4; }
 
+    /* [신규] 홈 - 교회 공지사항 */
+    .home-notice { margin-top: 24px; background: #fff; border: 1px solid #eef1f5; border-radius: 18px; padding: 18px; box-shadow: 0 6px 18px rgba(15,30,60,0.06); }
+    .hn-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .hn-title { font-weight: 800; color: var(--secondary); font-size: 1.05em; }
+    .hn-refresh { background: none; border: none; cursor: pointer; color: #9aa6b3; font-size: 1.05em; padding: 2px 6px; border-radius: 8px; }
+    .hn-refresh:hover { color: var(--primary); }
+    .hn-list { display: flex; flex-direction: column; gap: 8px; }
+    .hn-item { border: 1px solid #eef1f5; border-radius: 12px; overflow: hidden; }
+    .hn-item-head { display: flex; align-items: center; gap: 8px; padding: 11px 13px; cursor: pointer; }
+    .hn-badge { flex: 0 0 auto; font-size: 0.66em; font-weight: 800; color: #fff; background: var(--primary); border-radius: 6px; padding: 2px 7px; }
+    .hn-item-title { flex: 1; font-weight: 700; color: #33404f; font-size: 0.92em; word-break: keep-all; overflow-wrap: break-word; }
+    .hn-item-date { flex: 0 0 auto; font-size: 0.74em; color: #9aa6b3; font-weight: 600; }
+    .hn-arrow { flex: 0 0 auto; color: #c2cad4; transition: transform 0.2s; }
+    .hn-item.open .hn-arrow { transform: rotate(90deg); }
+    .hn-item-body { display: none; padding: 0 13px 13px; font-size: 0.88em; color: #5b6675; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+    .hn-item.open .hn-item-body { display: block; }
+    .hn-orig { display: inline-block; margin-top: 10px; color: var(--primary); font-weight: 700; text-decoration: none; font-size: 0.9em; }
+    .hn-orig:hover { text-decoration: underline; }
+    .hn-empty, .hn-loading { color: #9aa6b3; font-size: 0.9em; text-align: center; padding: 12px 0; }
+
+    [data-theme="dark"] .home-notice { background: #1b212b; border-color: #2a323e; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+    [data-theme="dark"] .hn-title { color: #eef2f7; }
+    [data-theme="dark"] .hn-item { border-color: #2a323e; }
+    [data-theme="dark"] .hn-item-title { color: #dfe6ee; }
+    [data-theme="dark"] .hn-item-body { color: #aeb8c4; }
+
     /* [신규] 홈 - 구절 검색 */
     .home-search { margin-top: 22px; }
     .home-search input { width: 100%; padding: 14px 16px; border-radius: 14px; border: 2px solid #e9ecef; font-size: 16px; outline: none; }
@@ -1571,6 +1597,14 @@
         <main class="scroll-content" id="scrollContent">
             <div class="container">
                 <div id="stepHome" class="active no-print">
+                    <div class="home-notice" id="homeNotice" style="display:none;">
+                        <div class="hn-head">
+                            <span class="hn-title">📢 교회 공지사항</span>
+                            <button class="hn-refresh" onclick="loadChurchNotices(true)" title="새로고침">⟳</button>
+                        </div>
+                        <div class="hn-list" id="hnList"><div class="hn-loading">공지를 불러오는 중…</div></div>
+                    </div>
+
                     <div class="main-menu-list">
                         <button class="menu-row study" onclick="selectRootMode('study')">
                             <span class="menu-row-ico">📖</span>
@@ -2880,6 +2914,9 @@ function initApp() {
     const lastC = localStorage.getItem('lastCourse');
     if (pc && lastC) pc.value = lastC;
     renderHomeProgress();
+
+    // [신규] 교회 공지사항 불러오기
+    loadChurchNotices();
 }
 
 function updateSession() {
@@ -2906,6 +2943,83 @@ function showStep(id) {
     document.querySelectorAll('.main-container .container > div:not(.header):not(.footer-verse)').forEach(div => div.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     if (id === 'stepHome') renderHomeProgress();
+}
+
+/* ===== [신규] 교회 공지사항 (jbch.org RSS → Apps Script 중계기) ===== */
+// 아래 주소에 Apps Script 웹 앱 URL을 넣으세요. 비워두면 공지 영역이 숨겨집니다.
+const CHURCH_NOTICE_RELAY = 'https://script.google.com/macros/s/AKfycbxmTM_aUMc6-vixGbmBQpdgQnTXuI4VeG6rneH9HqQKhTOrtQE9Azv4QAxo5RRHokJnmg/exec';
+let _noticeCache = null;
+
+async function loadChurchNotices(force) {
+    const box = document.getElementById('homeNotice');
+    const list = document.getElementById('hnList');
+    if (!box || !list) return;
+    if (!CHURCH_NOTICE_RELAY) { box.style.display = 'none'; return; } // URL 미설정 시 숨김
+    box.style.display = '';
+
+    // 캐시(5분) 사용 — 새로고침 버튼은 강제 갱신
+    const now = Date.now();
+    if (!force && _noticeCache && (now - _noticeCache.at < 5 * 60 * 1000)) {
+        renderNotices(_noticeCache.items); return;
+    }
+    list.innerHTML = '<div class="hn-loading">공지를 불러오는 중…</div>';
+    try {
+        const res = await fetch(CHURCH_NOTICE_RELAY, { method: 'GET' });
+        const data = await res.json();
+        if (!data || !data.ok || !Array.isArray(data.items)) throw new Error(data && data.error || '형식 오류');
+        _noticeCache = { at: now, items: data.items };
+        renderNotices(data.items);
+    } catch (e) {
+        list.innerHTML = '<div class="hn-empty">공지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</div>';
+    }
+}
+
+function renderNotices(items) {
+    const list = document.getElementById('hnList');
+    if (!list) return;
+    if (!items.length) { list.innerHTML = '<div class="hn-empty">등록된 공지가 없어요.</div>'; return; }
+    const top = items.slice(0, 6);
+    list.innerHTML = top.map((it, i) => {
+        const date = formatNoticeDate(it.date);
+        const body = decodeEntities(it.description || '').trim();
+        const link = it.link ? '<a class="hn-orig" href="' + escAttr(it.link) + '" target="_blank" rel="noopener">홈페이지에서 원문 보기 ›</a>' : '';
+        return '<div class="hn-item" id="hn-' + i + '">' +
+            '<div class="hn-item-head" onclick="toggleNotice(' + i + ')">' +
+                (i === 0 ? '<span class="hn-badge">최신</span>' : '') +
+                '<span class="hn-item-title">' + escHtml(decodeEntities(it.title)) + '</span>' +
+                '<span class="hn-item-date">' + date + '</span>' +
+                '<span class="hn-arrow">›</span>' +
+            '</div>' +
+            '<div class="hn-item-body">' + (body ? escHtml(body) : '<i>내용 없음</i>') + link + '</div>' +
+        '</div>';
+    }).join('');
+    // 첫 공지는 펼쳐서 보여줌
+    const first = document.getElementById('hn-0');
+    if (first) first.classList.add('open');
+}
+
+function toggleNotice(i) {
+    const el = document.getElementById('hn-' + i);
+    if (el) el.classList.toggle('open');
+}
+
+function formatNoticeDate(s) {
+    if (!s) return '';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+}
+
+function escHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escAttr(s) {
+    return escHtml(s).replace(/"/g, '&quot;');
+}
+function decodeEntities(s) {
+    const t = document.createElement('textarea');
+    t.innerHTML = String(s == null ? '' : s);
+    return t.value;
 }
 
 function selectRootMode(m) { 
@@ -6928,6 +7042,7 @@ let tickTimer = null;
 let myAnsweredQ = -1;
 let renderedQ = -1;
 let renderedPhase = '';
+let iAmLeaving = false; // 내가 직접 나가는 경우 "방이 종료되었어요" 알림 표시 안 함
 
 // 띄어쓰기·문장부호 차이는 무시하고 비교
 function normAns(s){ return (s || '').replace(/[\s.,·…"'""''’‘`~!?;:()]/g, ''); }
@@ -6961,8 +7076,11 @@ function gmBody(){ return document.getElementById('gmBody'); }
 
 async function closeGame(){
   if (gameCode){
-    const ok = await smConfirm('게임에서 나가시겠어요?', { okText: '나가기', cancelText: '계속하기' });
+    const host = isHost(gameRoom);
+    const msg = host ? '방을 종료하시겠습니까?' : '게임에서 나가시겠습니까?';
+    const ok = await smConfirm(msg, { okText: '예', cancelText: '아니오' });
     if (!ok) return;
+    iAmLeaving = true;
   }
   leaveRoom();
   const ov = document.getElementById('gmOverlay');
@@ -7040,8 +7158,10 @@ function enterRoom(code){
       const ov = document.getElementById('gmOverlay');
       if (ov && ov.classList.contains('show')){
         const p = ov.querySelector('.sm-panel'); if (p) p.classList.remove('big');
-        smAlert('방이 종료되었어요.'); renderLobby(); cleanupRoomState();
+        if (!iAmLeaving) smAlert('방이 종료되었어요.');
+        renderLobby(); cleanupRoomState();
       }
+      iAmLeaving = false;
       return;
     }
     gameRoom = snap.val();
@@ -7052,7 +7172,7 @@ function enterRoom(code){
 function cleanupRoomState(){
   if (gameUnsub){ gameUnsub(); gameUnsub = null; }
   clearTimeout(hostTimer); clearInterval(tickTimer);
-  gameCode = null; gameRoom = null; scheduledQ = -1; myAnsweredQ = -1; earlyQ = -1; renderedQ = -1; renderedPhase = '';
+  gameCode = null; gameRoom = null; scheduledQ = -1; myAnsweredQ = -1; earlyQ = -1; renderedQ = -1; renderedPhase = ''; iAmLeaving = false;
 }
 
 function leaveRoom(){
