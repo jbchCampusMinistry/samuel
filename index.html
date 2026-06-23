@@ -1591,6 +1591,16 @@
                             <span class="menu-row-text"><span class="menu-row-title">나의 기록</span><span class="menu-row-desc">누적 학습량·연속일수·잔디로 보는 나의 노력</span></span>
                             <span class="menu-row-arrow">›</span>
                         </button>
+                        <button class="menu-row rank" onclick="samuelOpenLeaderboard()">
+                            <span class="menu-row-ico">🥇</span>
+                            <span class="menu-row-text"><span class="menu-row-title">랭킹</span><span class="menu-row-desc">외운 구절·연속일수로 보는 전체 순위</span></span>
+                            <span class="menu-row-arrow">›</span>
+                        </button>
+                        <button class="menu-row battle" onclick="samuelOpenGame()">
+                            <span class="menu-row-ico">⚔️</span>
+                            <span class="menu-row-text"><span class="menu-row-title">암송 대결</span><span class="menu-row-desc">방을 만들어 최대 4명이 실시간으로 구절 맞히기</span></span>
+                            <span class="menu-row-arrow">›</span>
+                        </button>
                     </div>
 
                     <div class="home-search">
@@ -2654,6 +2664,8 @@ function logStroke() { const s = getStats(); s.strokes += 1; bumpDay(s); saveSta
 
 function dateKeyFmt(dt) { return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, '0')}.${String(dt.getDate()).padStart(2, '0')}`; }
 function dateKeyToObj(k) { const a = k.split('.').map(Number); return new Date(a[0], a[1] - 1, a[2]); }
+
+window.bibleData = bibleData; // [Firebase] 대결 게임에서 구절 풀 사용
 
 function computeStreak(days) {
     const keys = Object.keys(days).filter(k => days[k] > 0);
@@ -6393,13 +6405,82 @@ function initScriptSwipeAndZoom(isPC) {
   .nk-btn.ghost { background: #eef2f7; color: #555; }
   [data-theme="dark"] .nk-btn.ghost { background: #2a323e; color: #cbd3dd; }
   .nk-current { font-size: 1.3em; font-weight: 800; margin: 4px 0 18px; color: var(--primary); }
+
+  /* 메뉴 아이콘 색 */
+  .menu-row.rank .menu-row-ico { background: linear-gradient(135deg, #f7971e, #ffd200); }
+  .menu-row.battle .menu-row-ico { background: linear-gradient(135deg, #8e2de2, #4a00e0); }
+
+  /* 공통 풀스크린 오버레이 (랭킹/게임) */
+  .sm-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 99998; padding: 16px; }
+  .sm-overlay.show { display: flex; }
+  .sm-panel { background: #fff; border-radius: 20px; width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,0.3); }
+  [data-theme="dark"] .sm-panel { background: #1b212b; color: #eef2f7; }
+  .sm-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid #eef2f7; position: sticky; top: 0; background: inherit; border-radius: 20px 20px 0 0; }
+  [data-theme="dark"] .sm-head { border-bottom-color: #2a323e; }
+  .sm-head h2 { margin: 0; font-size: 1.25em; font-weight: 800; }
+  .sm-close { background: #eef2f7; border: none; width: 34px; height: 34px; border-radius: 50%; font-size: 1.1em; cursor: pointer; color: #555; }
+  [data-theme="dark"] .sm-close { background: #2a323e; color: #cbd3dd; }
+  .sm-body { padding: 18px 20px 24px; }
+
+  /* 랭킹 */
+  .lb-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .lb-tab { flex: 1; padding: 9px; border: none; border-radius: 10px; background: #eef2f7; font-weight: 700; cursor: pointer; color: #667; }
+  .lb-tab.active { background: var(--primary); color: #fff; }
+  [data-theme="dark"] .lb-tab { background: #2a323e; color: #aeb8c4; }
+  .lb-row { display: flex; align-items: center; gap: 12px; padding: 11px 8px; border-bottom: 1px solid #f0f4f8; }
+  [data-theme="dark"] .lb-row { border-bottom-color: #262e39; }
+  .lb-row.me { background: #eaf4ff; border-radius: 10px; }
+  [data-theme="dark"] .lb-row.me { background: #1e2c3d; }
+  .lb-rank { width: 30px; text-align: center; font-weight: 800; font-size: 1.05em; }
+  .lb-nick { flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lb-val { font-weight: 800; color: var(--primary); }
+  .lb-empty { text-align: center; color: #8a96a3; padding: 30px 0; }
+
+  /* 게임 */
+  .g-btn { display: block; width: 100%; box-sizing: border-box; padding: 15px; border: none; border-radius: 14px; font-size: 1.05em; font-weight: 800; cursor: pointer; margin-top: 10px; }
+  .g-btn.primary { background: var(--primary); color: #fff; }
+  .g-btn.purple { background: linear-gradient(135deg, #8e2de2, #4a00e0); color: #fff; }
+  .g-btn.ghost { background: #eef2f7; color: #555; }
+  [data-theme="dark"] .g-btn.ghost { background: #2a323e; color: #cbd3dd; }
+  .g-btn:disabled { opacity: 0.5; cursor: default; }
+  .g-or { text-align: center; color: #aeb8c4; margin: 14px 0; font-size: 0.85em; }
+  .g-code-in { width: 100%; box-sizing: border-box; padding: 14px; font-size: 1.6em; letter-spacing: 6px; text-align: center; border: 2px solid #dde6f0; border-radius: 12px; font-weight: 800; }
+  [data-theme="dark"] .g-code-in { background: #11161d; border-color: #2a323e; color: #eef2f7; }
+  .g-code-big { font-size: 2.6em; font-weight: 900; letter-spacing: 10px; text-align: center; color: var(--primary); margin: 6px 0 4px; }
+  .g-code-label { text-align: center; color: #8a96a3; font-size: 0.85em; margin-bottom: 14px; }
+  .g-players { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 16px; }
+  .g-player { background: #f4f8fd; border-radius: 12px; padding: 12px; text-align: center; font-weight: 700; position: relative; }
+  [data-theme="dark"] .g-player { background: #232b36; }
+  .g-player.host::after { content: '👑'; position: absolute; top: 4px; right: 8px; font-size: 0.9em; }
+  .g-player .g-p-score { display: block; font-size: 0.8em; color: var(--primary); font-weight: 800; margin-top: 3px; }
+  .g-msg { text-align: center; color: #8a96a3; margin: 10px 0; min-height: 20px; }
+  .g-qhead { text-align: center; margin-bottom: 6px; }
+  .g-qno { color: #8a96a3; font-size: 0.85em; font-weight: 700; }
+  .g-topic { font-size: 1.05em; font-weight: 800; margin: 6px 0 2px; }
+  .g-ref { color: var(--primary); font-weight: 800; font-size: 1.2em; }
+  .g-timebar { height: 8px; background: #eef2f7; border-radius: 99px; overflow: hidden; margin: 12px 0; }
+  [data-theme="dark"] .g-timebar { background: #2a323e; }
+  .g-timebar > i { display: block; height: 100%; background: linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c); transition: width 0.2s linear; }
+  .g-choice { display: block; width: 100%; box-sizing: border-box; text-align: left; padding: 14px 16px; border: 2px solid #e3e9f0; border-radius: 14px; background: #fff; font-size: 1em; cursor: pointer; margin-bottom: 10px; line-height: 1.4; transition: all 0.15s; }
+  [data-theme="dark"] .g-choice { background: #232b36; border-color: #333d4a; color: #eef2f7; }
+  .g-choice:disabled { cursor: default; }
+  .g-choice.picked { border-color: var(--primary); background: #eaf4ff; }
+  [data-theme="dark"] .g-choice.picked { background: #1e2c3d; }
+  .g-choice.correct { border-color: #2ecc71; background: #e9faf0; }
+  .g-choice.wrong { border-color: #e74c3c; background: #fdecea; }
+  [data-theme="dark"] .g-choice.correct { background: #14321f; }
+  [data-theme="dark"] .g-choice.wrong { background: #3a1a18; }
+  .g-result-row { display: flex; align-items: center; gap: 12px; padding: 12px 10px; border-bottom: 1px solid #f0f4f8; font-weight: 700; }
+  [data-theme="dark"] .g-result-row { border-bottom-color: #262e39; }
+  .g-result-row.win { background: #fff8e1; border-radius: 12px; font-size: 1.1em; }
+  [data-theme="dark"] .g-result-row.win { background: #33301c; }
 </style>
 
 <!-- ===== Firebase: 구글 로그인 · 기기 간 동기화 · 접속자 수 ===== -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { getDatabase, ref, set, get, remove, onValue, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+import { getDatabase, ref, set, update, get, remove, onValue, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAyuSWXxP78K-EqqXZZA4BteYi7asJp5Cg",
@@ -6422,7 +6503,6 @@ const provider = new GoogleAuthProvider();
 const DEVICE_KEYS = new Set(['theme','autoFullscreen','fingerDraw','toolbarVertical','toolbarPos','sidebar_layout','studyZoom']);
 
 let currentUser = null;
-let prevStatusUid = null;
 let applyingRemote = false;
 let uploadTimer = null;
 let myNickname = null;
@@ -6455,6 +6535,25 @@ async function uploadSnapshot(){
   try {
     await set(ref(db, 'users/' + currentUser.uid), { store: buildSnapshot(), updatedAt: serverTimestamp() });
   } catch(e){ console.warn('동기화 업로드 실패', e); }
+  publishLeaderboard();
+}
+
+// 랭킹에 내 기록 반영
+function publishLeaderboard(){
+  if (!currentUser || currentUser.isAnonymous || !myNickname) return;
+  try {
+    const comp = (typeof window.computeCompletion === 'function') ? window.computeCompletion() : { mem: 0 };
+    let days = {};
+    try { days = (JSON.parse(localStorage.getItem('samuel_stats')) || {}).days || {}; } catch(e){}
+    const streak = (typeof window.computeStreak === 'function') ? window.computeStreak(days) : { current: 0, longest: 0 };
+    set(ref(db, 'leaderboard/' + currentUser.uid), {
+      nick: myNickname,
+      mem: comp.mem || 0,
+      streak: streak.current || 0,
+      longest: streak.longest || 0,
+      updatedAt: serverTimestamp()
+    });
+  } catch(e){ console.warn('랭킹 업데이트 실패', e); }
 }
 
 function applyRemote(store){
@@ -6469,24 +6568,50 @@ function applyRemote(store){
   try { if (typeof window.renderHomeProgress === 'function') window.renderHomeProgress(); } catch(e){}
 }
 
-// 접속자 수(프레즌스)
-function setupPresence(uid){
-  if (prevStatusUid && prevStatusUid !== uid){ try { remove(ref(db, 'status/' + prevStatusUid)); } catch(e){} }
-  prevStatusUid = uid;
-  const myStatus = ref(db, 'status/' + uid);
-  onValue(ref(db, '.info/connected'), (snap) => {
-    if (snap.val() === false) return;
-    onDisconnect(myStatus).remove().then(() => set(myStatus, { online: true, ts: serverTimestamp() }));
-  });
+// 접속자 수(프레즌스) — 리스너는 한 번만, 항상 현재 사용자만 표시
+let presenceUid = null;
+let connectedListenerSet = false;
+
+function goOnline(){
+  if (!presenceUid) return;
+  const myStatus = ref(db, 'status/' + presenceUid);
+  onDisconnect(myStatus).remove();
+  set(myStatus, { online: true, ts: serverTimestamp() });
 }
 
+function setupPresence(uid){
+  // 이전 사용자(익명 등) 기록 + 예약된 onDisconnect 정리
+  if (presenceUid && presenceUid !== uid){
+    const old = ref(db, 'status/' + presenceUid);
+    try { onDisconnect(old).cancel(); } catch(e){}
+    try { remove(old); } catch(e){}
+  }
+  presenceUid = uid;
+  if (!connectedListenerSet){
+    connectedListenerSet = true;
+    onValue(ref(db, '.info/connected'), (snap) => { if (snap.val() === true) goOnline(); });
+  } else {
+    goOnline();
+  }
+}
+
+// 비정상 종료로 남은 기록 대비: 최근 활동 시간이 있는 것만 카운트(2분 이내)
 function subscribeCount(){
   onValue(ref(db, 'status'), (snap) => {
-    const n = snap.exists() ? snap.size : 0;
+    const now = Date.now();
+    let n = 0;
+    snap.forEach((child) => {
+      const v = child.val();
+      const ts = v && v.ts;
+      if (typeof ts !== 'number' || (now - ts) < 120000) n++;
+    });
     const el = document.getElementById('onlineCount');
     if (el) el.textContent = '👥 ' + n;
   });
 }
+
+// 살아있음을 주기적으로 갱신(heartbeat)
+setInterval(() => { if (presenceUid) goOnline(); }, 45000);
 
 function updateAuthUI(user){
   const btn = document.getElementById('authBtn');
@@ -6524,6 +6649,7 @@ onAuthStateChanged(auth, async (user) => {
     myNickname = (snap && snap.exists() && snap.val().nickname) ? snap.val().nickname : null;
     updateAuthUI(user);
     if (!myNickname) openNicknameModal(true); // 닉네임 없으면 설정 요구
+    else publishLeaderboard();
   } else {
     updateAuthUI(user);
   }
@@ -6625,10 +6751,374 @@ async function saveNickname(){
     msg.className = 'nk-msg ok'; msg.textContent = '저장되었어요!';
     nkRequired = false;
     updateAuthUI(currentUser);
+    publishLeaderboard();
     setTimeout(() => { const ov = document.getElementById('nkOverlay'); if (ov) ov.classList.remove('show'); }, 600);
   } catch(e){
     msg.className = 'nk-msg err'; msg.textContent = (typeof e === 'string') ? e : ('오류: ' + (e.message||e));
   } finally { btn.disabled = false; }
+}
+
+// ===================== 랭킹 =====================
+function ensureLeaderboardUI(){
+  if (document.getElementById('lbOverlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'lbOverlay'; ov.className = 'sm-overlay';
+  ov.innerHTML =
+    '<div class="sm-panel">' +
+      '<div class="sm-head"><h2>🥇 랭킹</h2><button class="sm-close" id="lbClose">✕</button></div>' +
+      '<div class="sm-body">' +
+        '<div class="lb-tabs">' +
+          '<button class="lb-tab active" data-k="mem">외운 구절</button>' +
+          '<button class="lb-tab" data-k="streak">연속 학습일</button>' +
+        '</div>' +
+        '<div id="lbList"><div class="lb-empty">불러오는 중...</div></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('show'); });
+  document.getElementById('lbClose').onclick = () => ov.classList.remove('show');
+  ov.querySelectorAll('.lb-tab').forEach(t => t.onclick = () => {
+    ov.querySelectorAll('.lb-tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    renderLeaderboard(t.dataset.k);
+  });
+}
+let lbData = [];
+async function renderLeaderboard(kind){
+  const list = document.getElementById('lbList');
+  const rows = lbData.slice().filter(r => r && r.nick)
+    .sort((a, b) => (b[kind]||0) - (a[kind]||0) || (b.mem||0) - (a.mem||0));
+  if (!rows.length){ list.innerHTML = '<div class="lb-empty">아직 기록이 없어요.<br>암송 퀴즈를 풀면 순위에 올라갑니다 🌱</div>'; return; }
+  const medal = ['🥇','🥈','🥉'];
+  const unit = kind === 'streak' ? '일' : '구절';
+  list.innerHTML = rows.slice(0, 50).map((r, i) => {
+    const me = currentUser && r.uid === currentUser.uid ? ' me' : '';
+    const rk = i < 3 ? medal[i] : (i + 1);
+    return '<div class="lb-row' + me + '"><div class="lb-rank">' + rk + '</div>' +
+      '<div class="lb-nick">' + escapeHtml(r.nick) + (me ? ' (나)' : '') + '</div>' +
+      '<div class="lb-val">' + (r[kind]||0) + unit + '</div></div>';
+  }).join('');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+window.samuelOpenLeaderboard = async function(){
+  ensureLeaderboardUI();
+  document.getElementById('lbOverlay').classList.add('show');
+  document.getElementById('lbList').innerHTML = '<div class="lb-empty">불러오는 중...</div>';
+  try {
+    const snap = await get(ref(db, 'leaderboard'));
+    lbData = [];
+    if (snap.exists()) snap.forEach(c => { const v = c.val() || {}; v.uid = c.key; lbData.push(v); });
+    renderLeaderboard('mem');
+  } catch(e){
+    document.getElementById('lbList').innerHTML = '<div class="lb-empty">불러오기 실패: ' + (e.message||e) + '</div>';
+  }
+};
+
+// ===================== 실시간 암송 대결 =====================
+const Q_TIME = 12000;     // 문제당 제한시간(ms)
+const REVEAL = 2800;      // 정답 공개 시간(ms)
+const Q_COUNT = 7;        // 문제 수
+const MAX_PLAYERS = 4;
+
+let gameCode = null;
+let gameUnsub = null;
+let gameRoom = null;
+let hostTimer = null;
+let scheduledQ = -1;
+let earlyQ = -1;
+let tickTimer = null;
+let myAnsweredQ = -1;
+
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function genCode(){ return String(Math.floor(1000 + Math.random() * 9000)); }
+function buildPool(course){
+  const bd = window.bibleData || {};
+  const seen = new Set(), out = [];
+  Object.keys(bd).forEach(day => (bd[day] || []).forEach(it => {
+    if (it.c <= course && it.txt && !seen.has(it.v)){ seen.add(it.v); out.push({ v: it.v, t: it.t, txt: it.txt }); }
+  }));
+  return out;
+}
+function isHost(room){ return room && currentUser && room.host === currentUser.uid; }
+
+function ensureGameUI(){
+  if (document.getElementById('gmOverlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'gmOverlay'; ov.className = 'sm-overlay';
+  ov.innerHTML =
+    '<div class="sm-panel">' +
+      '<div class="sm-head"><h2 id="gmTitle">⚔️ 암송 대결</h2><button class="sm-close" id="gmClose">✕</button></div>' +
+      '<div class="sm-body" id="gmBody"></div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  document.getElementById('gmClose').onclick = () => closeGame();
+}
+function gmBody(){ return document.getElementById('gmBody'); }
+
+function closeGame(){
+  leaveRoom();
+  const ov = document.getElementById('gmOverlay');
+  if (ov) ov.classList.remove('show');
+}
+
+window.samuelOpenGame = function(){
+  if (!currentUser || currentUser.isAnonymous){
+    alert('암송 대결은 로그인 후 이용할 수 있어요. 먼저 구글 로그인을 해주세요!');
+    return;
+  }
+  if (!myNickname){ openNicknameModal(true); return; }
+  ensureGameUI();
+  document.getElementById('gmOverlay').classList.add('show');
+  renderLobby();
+};
+
+function renderLobby(){
+  document.getElementById('gmTitle').textContent = '⚔️ 암송 대결';
+  gmBody().innerHTML =
+    '<p style="text-align:center;color:#8a96a3;margin:4px 0 18px;">방을 만들어 친구를 초대하거나, 방 코드로 참가하세요. (최대 ' + MAX_PLAYERS + '명)</p>' +
+    '<button class="g-btn purple" id="gmCreate">방 만들기</button>' +
+    '<div class="g-or">— 또는 —</div>' +
+    '<input class="g-code-in" id="gmCodeIn" inputmode="numeric" maxlength="4" placeholder="0000">' +
+    '<button class="g-btn primary" id="gmJoin">방 코드로 참가</button>' +
+    '<div class="g-msg" id="gmMsg"></div>';
+  document.getElementById('gmCreate').onclick = createRoom;
+  document.getElementById('gmJoin').onclick = () => joinRoom(document.getElementById('gmCodeIn').value.trim());
+}
+
+async function createRoom(){
+  const course = 4; // 전 과정 구절
+  let code = genCode();
+  try {
+    // 코드 중복 회피(몇 번 시도)
+    for (let i = 0; i < 5; i++){
+      const ex = await get(ref(db, 'rooms/' + code));
+      if (!ex.exists()) break;
+      code = genCode();
+    }
+    await set(ref(db, 'rooms/' + code), {
+      host: currentUser.uid, hostNick: myNickname, state: 'waiting', course: course,
+      qIndex: -1, createdAt: serverTimestamp(),
+      players: { [currentUser.uid]: { nick: myNickname, score: 0, joinedAt: serverTimestamp() } }
+    });
+    try { onDisconnect(ref(db, 'rooms/' + code)).remove(); } catch(e){} // 방장 나가면 방 자동 삭제
+    enterRoom(code);
+  } catch(e){ document.getElementById('gmMsg').textContent = '방 생성 실패: ' + (e.message||e); }
+}
+
+async function joinRoom(code){
+  const msg = document.getElementById('gmMsg');
+  if (!/^\d{4}$/.test(code)){ msg.textContent = '4자리 방 코드를 입력해 주세요.'; return; }
+  try {
+    const snap = await get(ref(db, 'rooms/' + code));
+    if (!snap.exists()){ msg.textContent = '존재하지 않는 방이에요.'; return; }
+    const room = snap.val();
+    if (room.state !== 'waiting'){ msg.textContent = '이미 게임이 시작된 방이에요.'; return; }
+    const cnt = room.players ? Object.keys(room.players).length : 0;
+    if (cnt >= MAX_PLAYERS && !(room.players && room.players[currentUser.uid])){ msg.textContent = '방이 가득 찼어요 (최대 ' + MAX_PLAYERS + '명).'; return; }
+    await set(ref(db, 'rooms/' + code + '/players/' + currentUser.uid), { nick: myNickname, score: 0, joinedAt: serverTimestamp() });
+    enterRoom(code);
+  } catch(e){ msg.textContent = '참가 실패: ' + (e.message||e); }
+}
+
+function enterRoom(code){
+  gameCode = code;
+  myAnsweredQ = -1; scheduledQ = -1;
+  // 나갈 때 자동 정리
+  const meRef = ref(db, 'rooms/' + code + '/players/' + currentUser.uid);
+  try { onDisconnect(meRef).remove(); } catch(e){}
+  gameUnsub = onValue(ref(db, 'rooms/' + code), (snap) => {
+    if (!snap.exists()){ // 방이 사라짐(호스트 나감)
+      gameRoom = null;
+      if (document.getElementById('gmOverlay').classList.contains('show')){ alert('방이 종료되었어요.'); renderLobby(); cleanupRoomState(); }
+      return;
+    }
+    gameRoom = snap.val();
+    onRoomUpdate();
+  });
+}
+
+function cleanupRoomState(){
+  if (gameUnsub){ gameUnsub(); gameUnsub = null; }
+  clearTimeout(hostTimer); clearInterval(tickTimer);
+  gameCode = null; gameRoom = null; scheduledQ = -1; myAnsweredQ = -1;
+}
+
+function leaveRoom(){
+  if (!gameCode) return;
+  const code = gameCode, room = gameRoom;
+  try {
+    if (room && isHost(room)){ remove(ref(db, 'rooms/' + code)); }
+    else { remove(ref(db, 'rooms/' + code + '/players/' + currentUser.uid)); }
+  } catch(e){}
+  cleanupRoomState();
+}
+
+function onRoomUpdate(){
+  const room = gameRoom;
+  if (!room) return;
+  if (room.state === 'waiting') renderRoom();
+  else if (room.state === 'playing'){ renderPlaying(); hostSchedule(); }
+  else if (room.state === 'finished'){ renderResult(); clearInterval(tickTimer); }
+}
+
+function playersArr(room){
+  return Object.keys(room.players || {}).map(uid => ({ uid, ...room.players[uid] }))
+    .sort((a, b) => (a.joinedAt||0) - (b.joinedAt||0));
+}
+
+function renderRoom(){
+  const room = gameRoom;
+  document.getElementById('gmTitle').textContent = '대기 중';
+  const ps = playersArr(room);
+  const host = isHost(room);
+  const plist = ps.map(p =>
+    '<div class="g-player' + (p.uid === room.host ? ' host' : '') + '">' + escapeHtml(p.nick) + '</div>'
+  ).join('') + Array.from({ length: MAX_PLAYERS - ps.length }, () => '<div class="g-player" style="opacity:.4;">빈 자리</div>').join('');
+  gmBody().innerHTML =
+    '<div class="g-code-big">' + gameCode + '</div>' +
+    '<div class="g-code-label">이 코드를 친구에게 알려주세요</div>' +
+    '<div class="g-players">' + plist + '</div>' +
+    (host
+      ? '<button class="g-btn purple" id="gmStart"' + (ps.length < 2 ? ' disabled' : '') + '>게임 시작 (' + ps.length + '명)</button>' +
+        (ps.length < 2 ? '<div class="g-msg">2명 이상 모이면 시작할 수 있어요.</div>' : '')
+      : '<div class="g-msg">방장이 시작하기를 기다리는 중...</div>') +
+    '<button class="g-btn ghost" id="gmLeave">나가기</button>';
+  if (host){ const s = document.getElementById('gmStart'); if (s) s.onclick = startGame; }
+  document.getElementById('gmLeave').onclick = closeGame;
+}
+
+async function startGame(){
+  if (!isHost(gameRoom)) return;
+  await genQuestion(gameCode, gameRoom.course, 0, true);
+}
+
+async function genQuestion(code, course, idx, first){
+  const pool = buildPool(course);
+  if (pool.length < 4) return;
+  const ai = Math.floor(Math.random() * pool.length);
+  const ans = pool[ai];
+  const others = shuffle(pool.filter((_, i) => i !== ai)).slice(0, 3);
+  const opts = shuffle([ans, ...others]);
+  const correct = opts.indexOf(ans);
+  const payload = {
+    qIndex: idx,
+    question: { topic: ans.t, ref: ans.v, choices: opts.map(o => o.txt), correct, startedAt: Date.now() }
+  };
+  if (first) payload.state = 'playing';
+  await update(ref(db, 'rooms/' + code), payload);
+}
+
+function renderPlaying(){
+  const room = gameRoom, q = room.question;
+  if (!q) return;
+  document.getElementById('gmTitle').textContent = '문제 ' + (room.qIndex + 1) + ' / ' + Q_COUNT;
+  const elapsed = Date.now() - q.startedAt;
+  const revealing = elapsed >= Q_TIME || allAnswered(room);
+  const picked = (room.answers && room.answers[room.qIndex] && room.answers[room.qIndex][currentUser.uid]);
+  const ps = playersArr(room).sort((a, b) => (b.score||0) - (a.score||0));
+  const scoreStrip = ps.map(p => '<div class="g-player"' + (p.uid === currentUser.uid ? ' style="outline:2px solid var(--primary);"' : '') + '>' + escapeHtml(p.nick) + '<span class="g-p-score">' + (p.score||0) + '점</span></div>').join('');
+
+  let html = '<div class="g-qhead"><div class="g-topic">' + escapeHtml(q.topic) + '</div><div class="g-ref">' + escapeHtml(q.ref) + '</div><div class="g-qno" style="margin-top:4px;">이 구절의 본문은?</div></div>' +
+    '<div class="g-timebar"><i id="gmBar" style="width:100%"></i></div>';
+  html += q.choices.map((c, i) => {
+    let cls = 'g-choice';
+    if (revealing){ if (i === q.correct) cls += ' correct'; else if (picked && picked.choice === i) cls += ' wrong'; }
+    else if (picked && picked.choice === i) cls += ' picked';
+    return '<button class="' + cls + '" data-i="' + i + '"' + ((revealing || picked) ? ' disabled' : '') + '>' + escapeHtml(c) + '</button>';
+  }).join('');
+  html += '<div class="g-players" style="margin-top:14px;">' + scoreStrip + '</div>';
+  gmBody().innerHTML = html;
+
+  if (!revealing && !picked){
+    gmBody().querySelectorAll('.g-choice').forEach(b => b.onclick = () => submitAnswer(parseInt(b.dataset.i)));
+  }
+  startTick();
+}
+
+function allAnswered(room){
+  const ans = room.answers && room.answers[room.qIndex];
+  const np = Object.keys(room.players || {}).length;
+  return ans && Object.keys(ans).length >= np;
+}
+
+function startTick(){
+  clearInterval(tickTimer);
+  tickTimer = setInterval(() => {
+    if (!gameRoom || gameRoom.state !== 'playing' || !gameRoom.question){ clearInterval(tickTimer); return; }
+    const elapsed = Date.now() - gameRoom.question.startedAt;
+    const ratio = Math.max(0, 1 - elapsed / Q_TIME);
+    const bar = document.getElementById('gmBar');
+    if (bar) bar.style.width = (ratio * 100) + '%';
+    if (elapsed >= Q_TIME){ renderPlaying(); clearInterval(tickTimer); } // 시간 종료 → 정답 공개
+  }, 200);
+}
+
+async function submitAnswer(choice){
+  const room = gameRoom; if (!room || !room.question) return;
+  if (myAnsweredQ === room.qIndex) return;
+  myAnsweredQ = room.qIndex;
+  const elapsed = Date.now() - room.question.startedAt;
+  const correct = choice === room.question.correct;
+  const points = correct ? Math.max(200, 1000 - Math.floor(elapsed / 15)) : 0;
+  try {
+    await set(ref(db, 'rooms/' + gameCode + '/answers/' + room.qIndex + '/' + currentUser.uid), { choice, correct, ms: elapsed });
+    if (points){
+      const cur = (room.players[currentUser.uid] && room.players[currentUser.uid].score) || 0;
+      await set(ref(db, 'rooms/' + gameCode + '/players/' + currentUser.uid + '/score'), cur + points);
+    }
+  } catch(e){ console.warn('답안 제출 실패', e); }
+  renderPlaying();
+}
+
+// 호스트만: 문제 진행 타이머
+function hostAdvance(room){
+  const next = room.qIndex + 1;
+  if (next >= Q_COUNT) update(ref(db, 'rooms/' + gameCode), { state: 'finished' });
+  else genQuestion(gameCode, room.course, next);
+}
+function hostSchedule(){
+  const room = gameRoom;
+  if (!isHost(room) || room.state !== 'playing' || !room.question) return;
+  // 모두 답하면 잠깐 정답 공개 후 바로 다음 문제
+  if (allAnswered(room) && earlyQ !== room.qIndex){
+    earlyQ = room.qIndex;
+    clearTimeout(hostTimer);
+    hostTimer = setTimeout(() => hostAdvance(room), REVEAL);
+    return;
+  }
+  if (scheduledQ === room.qIndex) return;
+  scheduledQ = room.qIndex;
+  const end = room.question.startedAt + Q_TIME + REVEAL;
+  clearTimeout(hostTimer);
+  hostTimer = setTimeout(() => hostAdvance(room), Math.max(300, end - Date.now()));
+}
+
+function renderResult(){
+  const room = gameRoom;
+  clearTimeout(hostTimer);
+  document.getElementById('gmTitle').textContent = '🏁 결과';
+  const ps = playersArr(room).sort((a, b) => (b.score||0) - (a.score||0));
+  const medal = ['🥇','🥈','🥉'];
+  const rows = ps.map((p, i) =>
+    '<div class="g-result-row' + (i === 0 ? ' win' : '') + '"><div class="lb-rank">' + (i < 3 ? medal[i] : (i + 1)) + '</div>' +
+    '<div class="lb-nick">' + escapeHtml(p.nick) + (p.uid === currentUser.uid ? ' (나)' : '') + '</div>' +
+    '<div class="lb-val">' + (p.score||0) + '점</div></div>').join('');
+  gmBody().innerHTML = '<div style="text-align:center;font-size:1.1em;font-weight:800;margin:6px 0 14px;">🎉 ' + escapeHtml(ps[0] ? ps[0].nick : '') + ' 님 우승!</div>' +
+    rows +
+    (isHost(room) ? '<button class="g-btn purple" id="gmAgain" style="margin-top:16px;">한 번 더</button>' : '<div class="g-msg" style="margin-top:14px;">방장이 다시 시작하기를 기다리는 중...</div>') +
+    '<button class="g-btn ghost" id="gmLeave2">나가기</button>';
+  if (isHost(room)){ const a = document.getElementById('gmAgain'); if (a) a.onclick = restartGame; }
+  document.getElementById('gmLeave2').onclick = closeGame;
+}
+
+async function restartGame(){
+  if (!isHost(gameRoom)) return;
+  const ps = gameRoom.players || {};
+  const resetPlayers = {};
+  Object.keys(ps).forEach(uid => resetPlayers[uid] = { ...ps[uid], score: 0 });
+  scheduledQ = -1; myAnsweredQ = -1; earlyQ = -1;
+  await update(ref(db, 'rooms/' + gameCode), { players: resetPlayers, answers: null, state: 'waiting', qIndex: -1, question: null });
 }
 
 window.samuelToggleAuth = async function(){
