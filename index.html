@@ -2633,8 +2633,9 @@ function renderHomeProgress() {
         : `<span class="hp-empty">아직 기록이 없어요. 암송 퀴즈를 풀면 여기에 진도가 쌓입니다 🌱</span>`;
 }
 
-function resetProgress() {
-    if (!confirm('저장된 모든 진도·암송률 기록을 삭제할까요?')) return;
+async function resetProgress() {
+    const ok = window.smConfirm ? await window.smConfirm('저장된 모든 진도·암송률 기록을 삭제할까요?', { okText: '삭제', cancelText: '취소' }) : confirm('저장된 모든 진도·암송률 기록을 삭제할까요?');
+    if (!ok) return;
     localStorage.removeItem(PROGRESS_KEY);
     renderHomeProgress();
 }
@@ -3567,10 +3568,9 @@ function execDeletePlowing() {
 }
 
 // 에디터 취소
-function cancelEditor() {
-    if(confirm("작성 중인 내용이 저장되지 않습니다. 취소하시겠습니까?")) {
-        showPlowingList();
-    }
+async function cancelEditor() {
+    const ok = window.smConfirm ? await window.smConfirm('작성 중인 내용이 저장되지 않습니다. 취소하시겠습니까?', { okText: '취소하기', cancelText: '계속 작성' }) : confirm('작성 중인 내용이 저장되지 않습니다. 취소하시겠습니까?');
+    if (ok) showPlowingList();
 }
 
 
@@ -6505,6 +6505,15 @@ function initScriptSwipeAndZoom(isPC) {
   [data-theme="dark"] .g-day { background: #11161d; border-color: #333d4a; color: #cbd3dd; }
   [data-theme="dark"] .g-day.on { background: #1e2c3d; color: #8cc6f0; border-color: #2b6aa0; }
   .g-day input { accent-color: var(--primary); }
+  /* 게임 시작 시 큰 화면(앱처럼) */
+  #gmOverlay .sm-panel.big { max-width: 720px; width: 96%; min-height: 88vh; display: flex; flex-direction: column; }
+  #gmOverlay .sm-panel.big .sm-body { flex: 1; }
+  #gmOverlay .sm-panel.big .g-topic { font-size: 1.3em; }
+  #gmOverlay .sm-panel.big .g-ref { font-size: 1.6em; }
+  #gmOverlay .sm-panel.big .g-qno { font-size: 1em; }
+  #gmOverlay .sm-panel.big .g-input { font-size: 1.15em; min-height: 130px; }
+  #gmOverlay .sm-panel.big .g-answer-box { font-size: 1.1em; }
+  #gmOverlay .sm-panel.big .g-btn.primary { padding: 17px; font-size: 1.15em; }
 
   /* 모바일 헤더 겹침 방지 */
   .fixed-header { grid-template-columns: 1fr minmax(0, auto) 1fr; }
@@ -6542,6 +6551,49 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
+
+// ===== 앱 스타일 알림/확인 모달 (브라우저 기본 팝업 대체) =====
+function ensureDialog(){
+  if (document.getElementById('smDlg')) return;
+  const ov = document.createElement('div');
+  ov.id = 'smDlg'; ov.className = 'nk-overlay';
+  ov.innerHTML = '<div class="nk-box">' +
+    '<p id="smDlgMsg" style="font-size:1.05em;font-weight:600;white-space:pre-line;line-height:1.55;margin:6px 2px 4px;"></p>' +
+    '<div class="nk-btns"><button class="nk-btn ghost" id="smDlgCancel">취소</button><button class="nk-btn primary" id="smDlgOk">확인</button></div>' +
+    '</div>';
+  document.body.appendChild(ov);
+}
+let smResolve = null;
+function smClose(val){ const ov = document.getElementById('smDlg'); if (ov) ov.classList.remove('show'); if (smResolve){ const r = smResolve; smResolve = null; r(val); } }
+function smConfirm(message, opts){
+  opts = opts || {};
+  if (smResolve) smClose(false);
+  ensureDialog();
+  const ov = document.getElementById('smDlg');
+  document.getElementById('smDlgMsg').textContent = String(message);
+  const ok = document.getElementById('smDlgOk'), cancel = document.getElementById('smDlgCancel');
+  ok.textContent = opts.okText || '확인'; cancel.textContent = opts.cancelText || '취소';
+  cancel.style.display = '';
+  ov.classList.add('show');
+  ok.onclick = () => smClose(true);
+  cancel.onclick = () => smClose(false);
+  ov.onclick = (e) => { if (e.target === ov) smClose(false); };
+  return new Promise(res => { smResolve = res; });
+}
+function smAlert(message){
+  if (smResolve) smClose(true);
+  ensureDialog();
+  const ov = document.getElementById('smDlg');
+  document.getElementById('smDlgMsg').textContent = String(message);
+  const ok = document.getElementById('smDlgOk'), cancel = document.getElementById('smDlgCancel');
+  ok.textContent = '확인'; cancel.style.display = 'none';
+  ov.classList.add('show');
+  ok.onclick = () => smClose(true);
+  ov.onclick = (e) => { if (e.target === ov) smClose(true); };
+  return new Promise(res => { smResolve = res; });
+}
+window.smAlert = smAlert; window.smConfirm = smConfirm;
+window.alert = smAlert; // 모든 기본 alert을 앱 스타일로 교체
 
 // 기기마다 달라야 하는(동기화 제외) 키
 const DEVICE_KEYS = new Set(['theme','autoFullscreen','fingerDraw','toolbarVertical','toolbarPos','sidebar_layout','studyZoom']);
@@ -6907,10 +6959,14 @@ function ensureGameUI(){
 }
 function gmBody(){ return document.getElementById('gmBody'); }
 
-function closeGame(){
+async function closeGame(){
+  if (gameCode){
+    const ok = await smConfirm('게임에서 나가시겠어요?', { okText: '나가기', cancelText: '계속하기' });
+    if (!ok) return;
+  }
   leaveRoom();
   const ov = document.getElementById('gmOverlay');
-  if (ov) ov.classList.remove('show');
+  if (ov){ ov.classList.remove('show'); const p = ov.querySelector('.sm-panel'); if (p) p.classList.remove('big'); }
 }
 
 window.samuelOpenGame = function(){
@@ -6981,7 +7037,11 @@ function enterRoom(code){
   gameUnsub = onValue(ref(db, 'rooms/' + code), (snap) => {
     if (!snap.exists()){ // 방이 사라짐(호스트 나감)
       gameRoom = null;
-      if (document.getElementById('gmOverlay').classList.contains('show')){ alert('방이 종료되었어요.'); renderLobby(); cleanupRoomState(); }
+      const ov = document.getElementById('gmOverlay');
+      if (ov && ov.classList.contains('show')){
+        const p = ov.querySelector('.sm-panel'); if (p) p.classList.remove('big');
+        smAlert('방이 종료되었어요.'); renderLobby(); cleanupRoomState();
+      }
       return;
     }
     gameRoom = snap.val();
@@ -7008,6 +7068,10 @@ function leaveRoom(){
 function onRoomUpdate(){
   const room = gameRoom;
   if (!room) return;
+  // 게임이 시작되면 화면을 크게(앱처럼)
+  const ov = document.getElementById('gmOverlay');
+  const panel = ov && ov.querySelector('.sm-panel');
+  if (panel) panel.classList.toggle('big', room.state === 'playing' || room.state === 'finished');
   if (room.state === 'waiting') renderRoom();
   else if (room.state === 'playing'){ renderPlaying(); hostSchedule(); }
   else if (room.state === 'finished'){ renderResult(); clearInterval(tickTimer); }
