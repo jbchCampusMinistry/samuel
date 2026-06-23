@@ -1559,7 +1559,7 @@
             </div>
             <div class="nav-btn-group">
                 <span class="nav-btn online-badge" id="onlineCount" title="지금 접속 중인 인원">👥 –</span>
-                <button class="nav-btn auth-btn" id="authBtn" onclick="samuelToggleAuth()" title="구글 로그인">👤</button>
+                <button class="nav-btn auth-btn" id="authBtn" onclick="samuelToggleAuth()" title="구글 로그인">로그인</button>
                 <button class="nav-btn fullscreen-btn" onclick="toggleFullscreen()" title="전체화면" aria-label="전체화면">⛶</button>
                 <button class="nav-btn theme-toggle-btn" onclick="toggleTheme()" title="다크모드 전환" aria-label="다크모드 전환">🌙</button>
                 <button class="nav-btn" onclick="goBack()">◀</button>
@@ -6361,8 +6361,38 @@ function initScriptSwipeAndZoom(isPC) {
 }
 </script>
 <style>
+  /* 헤더: 좌(메뉴) - 중앙(타이틀) - 우(버튼) 3등분 → 타이틀 정중앙 */
+  .fixed-header { display: grid !important; grid-template-columns: 1fr auto 1fr; gap: 6px; }
+  .fixed-header > .nav-btn:first-child { justify-self: start; }
+  .fixed-header > .header-title-area { justify-self: center; flex-grow: 0 !important; }
+  .fixed-header > .nav-btn-group { justify-self: end; }
+
   .online-badge { font-size: 0.78em; padding: 0 8px; display: inline-flex; align-items: center; cursor: default; white-space: nowrap; opacity: 0.85; }
-  .auth-btn { font-size: 1.1em; }
+  /* 로그인/계정 버튼 — 알약 모양으로 명확하게 */
+  .auth-btn { font-size: 0.85rem !important; font-weight: 700; border: 1.5px solid var(--primary) !important; color: var(--primary) !important; border-radius: 999px; padding: 5px 13px !important; white-space: nowrap; line-height: 1; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .auth-btn.logged-in { background: var(--primary); color: #fff !important; }
+  [data-theme="dark"] .auth-btn { border-color: #5aa9e6 !important; color: #8cc6f0 !important; }
+  [data-theme="dark"] .auth-btn.logged-in { background: #2b6aa0; color: #fff !important; }
+
+  /* 닉네임 / 계정 모달 */
+  .nk-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 99999; padding: 20px; }
+  .nk-overlay.show { display: flex; }
+  .nk-box { background: #fff; border-radius: 18px; padding: 26px 24px; width: 100%; max-width: 360px; box-shadow: 0 20px 50px rgba(0,0,0,0.25); text-align: center; }
+  [data-theme="dark"] .nk-box { background: #1b212b; color: #eef2f7; }
+  .nk-box h3 { margin: 0 0 6px; font-size: 1.2em; font-weight: 800; }
+  .nk-box p.nk-desc { margin: 0 0 16px; font-size: 0.88em; color: #8a96a3; }
+  .nk-input { width: 100%; box-sizing: border-box; padding: 12px 14px; font-size: 1.05em; border: 2px solid #dde6f0; border-radius: 12px; text-align: center; outline: none; }
+  .nk-input:focus { border-color: var(--primary); }
+  [data-theme="dark"] .nk-input { background: #11161d; border-color: #2a323e; color: #eef2f7; }
+  .nk-msg { min-height: 18px; font-size: 0.82em; margin: 8px 0 4px; }
+  .nk-msg.err { color: #e74c3c; }
+  .nk-msg.ok { color: #27ae60; }
+  .nk-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .nk-btn { flex: 1; padding: 12px; border: none; border-radius: 12px; font-size: 1em; font-weight: 700; cursor: pointer; }
+  .nk-btn.primary { background: var(--primary); color: #fff; }
+  .nk-btn.ghost { background: #eef2f7; color: #555; }
+  [data-theme="dark"] .nk-btn.ghost { background: #2a323e; color: #cbd3dd; }
+  .nk-current { font-size: 1.3em; font-weight: 800; margin: 4px 0 18px; color: var(--primary); }
 </style>
 
 <!-- ===== Firebase: 구글 로그인 · 기기 간 동기화 · 접속자 수 ===== -->
@@ -6395,6 +6425,7 @@ let currentUser = null;
 let prevStatusUid = null;
 let applyingRemote = false;
 let uploadTimer = null;
+let myNickname = null;
 
 // localStorage 쓰기를 가로채 변경 시 자동 업로드
 const _setItem = Storage.prototype.setItem;
@@ -6461,41 +6492,148 @@ function updateAuthUI(user){
   const btn = document.getElementById('authBtn');
   if (!btn) return;
   if (user && !user.isAnonymous){
-    btn.textContent = '🚪';
-    btn.title = (user.displayName || '로그인됨') + ' — 로그아웃';
+    btn.textContent = myNickname || '내 계정';
+    btn.title = (myNickname ? myNickname + ' — ' : '') + '계정 관리';
+    btn.classList.add('logged-in');
   } else {
-    btn.textContent = '👤';
-    btn.title = '구글 로그인';
+    btn.textContent = '로그인';
+    btn.title = '구글 계정으로 로그인';
+    btn.classList.remove('logged-in');
   }
 }
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   if (!user){
+    myNickname = null;
+    updateAuthUI(null);
     try { await signInAnonymously(auth); } catch(e){ console.warn('익명 로그인 실패', e); }
     return;
   }
   setupPresence(user.uid);
-  updateAuthUI(user);
   if (!user.isAnonymous){
+    let snap = null;
     try {
-      const snap = await get(ref(db, 'users/' + user.uid));
+      snap = await get(ref(db, 'users/' + user.uid));
       if (snap.exists() && snap.val().store){
         applyRemote(snap.val().store);
       } else {
         await uploadSnapshot(); // 첫 로그인 시 이 기기 데이터를 클라우드에 올림
       }
     } catch(e){ console.warn('동기화 불러오기 실패', e); }
+    myNickname = (snap && snap.exists() && snap.val().nickname) ? snap.val().nickname : null;
+    updateAuthUI(user);
+    if (!myNickname) openNicknameModal(true); // 닉네임 없으면 설정 요구
+  } else {
+    updateAuthUI(user);
   }
 });
 
 subscribeCount();
 
+// ---- 닉네임 등록/검증 ----
+async function claimNickname(raw){
+  const nick = (raw || '').trim();
+  if (nick.length < 2 || nick.length > 12) throw '닉네임은 2~12자로 입력해 주세요.';
+  if (!/^[가-힣a-zA-Z0-9_]+$/.test(nick)) throw '한글·영문·숫자·_ 만 사용할 수 있어요.';
+  const key = nick.toLowerCase();
+  const nickRef = ref(db, 'nicknames/' + key);
+  const cur = await get(nickRef);
+  if (cur.exists() && cur.val() !== currentUser.uid) throw '이미 사용 중인 닉네임이에요. 다른 닉네임을 입력해 주세요.';
+  if (myNickname && myNickname.toLowerCase() !== key){
+    try { await remove(ref(db, 'nicknames/' + myNickname.toLowerCase())); } catch(e){}
+  }
+  await set(nickRef, currentUser.uid);
+  await set(ref(db, 'users/' + currentUser.uid + '/nickname'), nick);
+  myNickname = nick;
+}
+
+// ---- 모달 (동적 생성) ----
+function ensureModals(){
+  if (document.getElementById('nkOverlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'nkOverlay'; ov.className = 'nk-overlay';
+  ov.innerHTML =
+    '<div class="nk-box">' +
+      '<div id="nkAccountView" style="display:none;">' +
+        '<h3>내 계정</h3>' +
+        '<div class="nk-current" id="nkCurrentNick"></div>' +
+        '<div class="nk-btns">' +
+          '<button class="nk-btn ghost" id="nkChangeBtn">닉네임 변경</button>' +
+          '<button class="nk-btn primary" id="nkLogoutBtn" style="background:#e74c3c;">로그아웃</button>' +
+        '</div>' +
+        '<div class="nk-btns"><button class="nk-btn ghost" id="nkCloseBtn">닫기</button></div>' +
+      '</div>' +
+      '<div id="nkEditView" style="display:none;">' +
+        '<h3 id="nkEditTitle">닉네임 설정</h3>' +
+        '<p class="nk-desc">이 사이트에서 사용할 이름이에요. (2~12자, 중복 불가)</p>' +
+        '<input type="text" class="nk-input" id="nkInput" placeholder="닉네임 입력" maxlength="12" autocomplete="off">' +
+        '<div class="nk-msg" id="nkMsg"></div>' +
+        '<div class="nk-btns">' +
+          '<button class="nk-btn ghost" id="nkCancelBtn">취소</button>' +
+          '<button class="nk-btn primary" id="nkSaveBtn">확인</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+
+  document.getElementById('nkChangeBtn').onclick = () => showEditView(false);
+  document.getElementById('nkLogoutBtn').onclick = async () => { closeModal(); try { await signOut(auth); } catch(e){ alert('로그아웃 실패: ' + (e.message||e)); } };
+  document.getElementById('nkCloseBtn').onclick = closeModal;
+  document.getElementById('nkCancelBtn').onclick = closeModal;
+  document.getElementById('nkSaveBtn').onclick = saveNickname;
+  document.getElementById('nkInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveNickname(); });
+}
+
+let nkRequired = false;
+function closeModal(){
+  if (nkRequired) return; // 첫 설정은 닫기 금지
+  const ov = document.getElementById('nkOverlay');
+  if (ov) ov.classList.remove('show');
+}
+function showEditView(required){
+  document.getElementById('nkAccountView').style.display = 'none';
+  document.getElementById('nkEditView').style.display = 'block';
+  document.getElementById('nkEditTitle').textContent = required ? '닉네임을 설정해 주세요' : '닉네임 변경';
+  document.getElementById('nkCancelBtn').style.display = required ? 'none' : '';
+  const inp = document.getElementById('nkInput');
+  inp.value = myNickname || '';
+  document.getElementById('nkMsg').textContent = '';
+  setTimeout(() => inp.focus(), 50);
+}
+function openNicknameModal(required){
+  ensureModals();
+  nkRequired = !!required;
+  document.getElementById('nkOverlay').classList.add('show');
+  showEditView(!!required);
+}
+function openAccountModal(){
+  ensureModals();
+  nkRequired = false;
+  document.getElementById('nkCurrentNick').textContent = myNickname ? ('@' + myNickname) : '(닉네임 없음)';
+  document.getElementById('nkAccountView').style.display = 'block';
+  document.getElementById('nkEditView').style.display = 'none';
+  document.getElementById('nkOverlay').classList.add('show');
+}
+async function saveNickname(){
+  const msg = document.getElementById('nkMsg');
+  const btn = document.getElementById('nkSaveBtn');
+  msg.className = 'nk-msg'; msg.textContent = '확인 중...';
+  btn.disabled = true;
+  try {
+    await claimNickname(document.getElementById('nkInput').value);
+    msg.className = 'nk-msg ok'; msg.textContent = '저장되었어요!';
+    nkRequired = false;
+    updateAuthUI(currentUser);
+    setTimeout(() => { const ov = document.getElementById('nkOverlay'); if (ov) ov.classList.remove('show'); }, 600);
+  } catch(e){
+    msg.className = 'nk-msg err'; msg.textContent = (typeof e === 'string') ? e : ('오류: ' + (e.message||e));
+  } finally { btn.disabled = false; }
+}
+
 window.samuelToggleAuth = async function(){
   if (currentUser && !currentUser.isAnonymous){
-    if (confirm('로그아웃 할까요? (이 기기에 저장된 진도는 그대로 남습니다)')){
-      try { await signOut(auth); } catch(e){ alert('로그아웃 실패: ' + (e.message||e)); }
-    }
+    openAccountModal();
   } else {
     try { await signInWithPopup(auth, provider); }
     catch(e){
