@@ -12,14 +12,22 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="사무엘학교">
 
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
 <!-- [신규] Pretendard 웹폰트 (CSS에서 사용 중이나 누락되어 있던 폰트 로드) -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <title>사무엘학교</title>
 <style>
-    :root { 
-        --primary: #3498db; 
+    /* 앱 실행 스플래시 화면(icon.png) */
+    #appSplash { position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; background: #ffffff; transition: opacity 0.45s ease; }
+    #appSplash img { width: min(64vw, 340px); height: auto; max-height: 62vh; object-fit: contain; }
+    #appSplash.hide { opacity: 0; pointer-events: none; }
+    [data-theme="dark"] #appSplash { background: #14181f; }
+
+    :root {
+        --primary: #3498db;
         --secondary: #2c3e50; 
         --success: #2ecc71; 
         --warning: #f39c12; 
@@ -1434,6 +1442,27 @@
 </script>
 </head>
 <body onload="initApp()">
+
+<!-- 앱 실행 스플래시 — 홈화면에서 열 때 icon.png가 첫 화면으로 보임(iOS/안드로이드/데스크톱 공통) -->
+<div id="appSplash" aria-hidden="true">
+    <img src="icon-512.png" alt="사무엘학교" fetchpriority="high">
+</div>
+<script>
+(function(){
+    var s = document.getElementById('appSplash');
+    if (!s) return;
+    var MIN = 800, start = Date.now(), done = false;
+    function hide(){
+        if (done) return; done = true;
+        s.classList.add('hide');
+        setTimeout(function(){ if (s && s.parentNode) s.parentNode.removeChild(s); }, 600);
+    }
+    function ready(){ setTimeout(hide, Math.max(0, MIN - (Date.now() - start))); }
+    if (document.readyState !== 'loading') ready();
+    else document.addEventListener('DOMContentLoaded', ready);
+    setTimeout(hide, 4000); // 안전장치: 무슨 일이 있어도 숨김
+})();
+</script>
 
 <div id="customConfirm">
     <div class="confirm-box" style="max-width: 380px; text-align: left;">
