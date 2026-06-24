@@ -220,10 +220,9 @@
     [data-theme="dark"] .menu-row-desc { color: #93a0b0; }
     [data-theme="dark"] .menu-row-arrow { color: #5b6675; }
 
-    /* [신규] 홈 - 로그인 환영 배너 */
-    .home-welcome { margin-top: 18px; padding: 16px 20px; border-radius: 16px; background: linear-gradient(120deg, #2193b0, #6dd5ed); color: #fff; font-size: 1.12em; font-weight: 700; box-shadow: 0 8px 22px rgba(33,147,176,0.28); display: flex; align-items: center; gap: 8px; }
-    .home-welcome b { font-weight: 800; }
-    [data-theme="dark"] .home-welcome { background: linear-gradient(120deg, #1d5f74, #2b8aa3); box-shadow: 0 8px 22px rgba(0,0,0,0.4); }
+    /* [신규] 헤더 - 로그인 환영 글씨 (이름 옆) */
+    .welcome-text { font-size: 0.9rem; font-weight: 700; color: var(--secondary); white-space: nowrap; align-self: center; }
+    [data-theme="dark"] .welcome-text { color: #dfe6ee; }
 
     /* [신규] 홈 - 나의 진도 + 공지사항 2단 배치 (동일 크기) */
     .home-bottom-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; margin-top: 24px; }
@@ -1628,6 +1627,7 @@
             <div class="nav-btn-group">
                 <span class="nav-btn online-badge" id="onlineCount" title="지금 접속 중인 인원">👥 –</span>
                 <button class="nav-btn auth-btn" id="authBtn" onclick="samuelToggleAuth()" title="구글 로그인">로그인</button>
+                <span class="welcome-text hide-on-mobile" id="welcomeText" style="display:none;">환영합니다</span>
                 <button class="nav-btn fullscreen-btn hide-on-mobile" onclick="toggleFullscreen()" title="전체화면" aria-label="전체화면">⛶</button>
                 <button class="nav-btn theme-toggle-btn" onclick="toggleTheme()" title="다크모드 전환" aria-label="다크모드 전환">🌙</button>
                 <button class="nav-btn" onclick="goBack()">◀</button>
@@ -1638,7 +1638,6 @@
         <main class="scroll-content" id="scrollContent">
             <div class="container">
                 <div id="stepHome" class="active no-print">
-                    <div class="home-welcome" id="homeWelcome" style="display:none;"></div>
                     <div class="main-menu-list">
                         <button class="menu-row study" onclick="selectRootMode('study')">
                             <span class="menu-row-ico">📖</span>
@@ -1657,7 +1656,7 @@
                         </button>
                         <button class="menu-row stats" onclick="selectRootMode('stats')">
                             <span class="menu-row-ico">🙋</span>
-                            <span class="menu-row-text"><span class="menu-row-title">마이페이지</span><span class="menu-row-desc">수료 점수 계산기·학습 기록·잔디로 보는 나의 노력</span></span>
+                            <span class="menu-row-text"><span class="menu-row-title">마이페이지</span><span class="menu-row-desc">수료 점수 계산기와 나의 학습 기록</span></span>
                             <span class="menu-row-arrow">›</span>
                         </button>
                         <button class="menu-row rank" onclick="samuelOpenLeaderboard()">
@@ -6930,7 +6929,7 @@ setInterval(() => { if (presenceUid) goOnline(); }, 45000);
 
 function updateAuthUI(user){
   const btn = document.getElementById('authBtn');
-  const wel = document.getElementById('homeWelcome');
+  const wel = document.getElementById('welcomeText');
   const loggedIn = !!(user && !user.isAnonymous);
   if (btn){
     if (loggedIn){
@@ -6944,14 +6943,7 @@ function updateAuthUI(user){
     }
   }
   if (wel){
-    if (loggedIn && myNickname){
-      wel.innerHTML = '👋 <b></b>님, 환영합니다!';
-      wel.querySelector('b').textContent = myNickname;
-      wel.style.display = 'flex';
-    } else {
-      wel.style.display = 'none';
-      wel.textContent = '';
-    }
+    wel.style.display = loggedIn ? 'inline' : 'none';
   }
 }
 
