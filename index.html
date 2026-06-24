@@ -465,6 +465,8 @@
     #studyScrollWrapper.flow { position: relative; flex: none; overflow: visible; height: auto; }
 
     /* [신규] 암송 외우기 몰입 모드 — 상단(사무엘학교)·하단(말씀) 바 숨겨 한 화면에 맞춤, 스크롤/스와이프로 잠깐 표시 */
+    /* 손가락 핀치(두 손가락 확대)는 JS로 처리하므로 브라우저 기본 핀치줌은 막고, 한 손가락 세로 스크롤만 허용 */
+    body.study-immersive #scrollContent { touch-action: pan-y; }
     body.study-immersive #globalHeader { position: fixed; top: 0; left: 0; right: 0; transform: translateY(-100%); transition: transform .28s ease; z-index: 3000; will-change: transform; }
     body.study-immersive .app-footer { position: fixed; bottom: 0; left: 0; right: 0; transform: translateY(100%); transition: transform .28s ease; z-index: 3000; }
     body.study-immersive.chrome-reveal #globalHeader { transform: translateY(0); }
@@ -5319,6 +5321,7 @@ function commitHistory() {
 function onDrawDown(e) {
     if (!isPenModeActive || !isDrawTool(currentTool)) return;
     if (!drawCanvas.classList.contains('draw-active')) return;
+    if (gPinch) return; // 두 손가락 핀치 중엔 그리지 않음
     // [신규] 펜(스타일러스)·마우스로만 필기 — 손가락 터치는 그리지 않고 직접 스크롤
     if (!isDrawablePointer(e)) {
         if (e.pointerType === 'touch') {
@@ -5350,6 +5353,7 @@ function onDrawDown(e) {
 }
 
 function onDrawMove(e) {
+    if (gPinch) return; // 핀치 중엔 그리기/스크롤 무시
     // 손가락 스크롤 처리(그리기 아님)
     if (fingerPan && e.pointerId === fingerPan.id) {
         if (fingerPan.sc) fingerPan.sc.scrollTop = fingerPan.startTop - (e.clientY - fingerPan.startY);
@@ -5593,7 +5597,9 @@ let studyZoomLocked = false, studyUserZoom = 1, fitScaleCache = 1;
 const LOCK_OPEN_SVG  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
 const LOCK_CLOSED_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 function loadStudyZoom() {
-    try { const s = JSON.parse(localStorage.getItem('studyZoom')); if (s) { studyZoomLocked = !!s.locked; studyUserZoom = (typeof s.zoom === 'number' && s.zoom >= 1) ? s.zoom : 1; } } catch (e) {}
+    // 확대 배율은 복원하되, 잠금은 항상 풀린 상태로 시작(잠금이 저장돼 계속 잠겨 보여 줌이 안 되는 문제 방지)
+    studyZoomLocked = false;
+    try { const s = JSON.parse(localStorage.getItem('studyZoom')); if (s) { studyUserZoom = (typeof s.zoom === 'number' && s.zoom >= 1) ? s.zoom : 1; } } catch (e) {}
 }
 function saveStudyZoom() { try { localStorage.setItem('studyZoom', JSON.stringify({ locked: studyZoomLocked, zoom: studyUserZoom })); } catch (e) {} }
 function updateZoomBadge(uz) {
@@ -5654,6 +5660,49 @@ function fitStudyToScreen() {
     body.style.zoom = '';
     applyStudyScale();
 }
+// 핀치 중에는 fitScale 재계산 없이 캐시값으로 빠르게 배율만 적용(부드럽게)
+function applyZoomFast() {
+    const body = document.getElementById('paperBodyContent');
+    if (body) body.style.setProperty('--study-scale', (fitScaleCache * studyUserZoom).toFixed(3));
+    updateZoomBadge(studyUserZoom);
+}
+
+/* ── 손가락 핀치(두 손가락)로 암송 외우기 확대/축소 ── */
+const gPts = new Map();   // 활성 터치 포인터 위치
+let gPinch = null;        // {d0:시작 거리, z0:시작 배율}
+function studyGestureDown(e) {
+    if (e.pointerType !== 'touch' || !document.body.classList.contains('study-immersive')) return;
+    gPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (gPts.size === 2) {
+        const p = [...gPts.values()];
+        gPinch = { d0: Math.max(1, Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y)), z0: studyUserZoom };
+        // 핀치 시작 → 그리던 획/손가락 스크롤 취소(글씨 안 그려지게)
+        isDrawing = false; curStroke = null; fingerPan = null;
+    }
+}
+function studyGestureMove(e) {
+    if (!gPts.has(e.pointerId)) return;
+    const rec = gPts.get(e.pointerId); rec.x = e.clientX; rec.y = e.clientY;
+    if (gPinch && gPts.size >= 2) {
+        const p = [...gPts.values()];
+        const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+        if (!studyZoomLocked) {
+            studyUserZoom = Math.min(3, Math.max(1, gPinch.z0 * (d / gPinch.d0)));
+            applyZoomFast();
+        }
+        if (e.cancelable) e.preventDefault();
+    }
+}
+function studyGestureUp(e) {
+    if (!gPts.has(e.pointerId)) return;
+    gPts.delete(e.pointerId);
+    if (gPts.size < 2 && gPinch) { gPinch = null; saveStudyZoom(); applyStudyScale(); if (typeof resizeDrawCanvas === 'function' && drawCanvas) resizeDrawCanvas(); }
+}
+// 캡처 단계로 등록 → 캔버스(필기) 위에서도 핀치 인식
+document.addEventListener('pointerdown', studyGestureDown, true);
+document.addEventListener('pointermove', studyGestureMove, true);
+document.addEventListener('pointerup', studyGestureUp, true);
+document.addEventListener('pointercancel', studyGestureUp, true);
 
 /* ==========================================================================
    [신규 기능] 윈도우 스타일 고급 색상 편집기 (확장 팔레트)
