@@ -6716,10 +6716,10 @@ function initScriptSwipeAndZoom(isPC) {
   /* 대결 출제범위 설정 */
   .g-set { background: #f4f8fd; border-radius: 14px; padding: 14px; margin: 4px 0 14px; }
   [data-theme="dark"] .g-set { background: #232b36; }
-  .g-set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-  .g-set-row span { font-weight: 700; }
-  .g-set-row select { padding: 8px 12px; border: 2px solid #dde6f0; border-radius: 10px; font-weight: 700; font-size: 1em; }
-  [data-theme="dark"] .g-set-row select { background: #11161d; border-color: #2a323e; color: #eef2f7; }
+  .g-set-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .g-set-row span { font-weight: 700; flex: 0 0 auto; white-space: nowrap; min-width: 64px; }
+  .g-set-row select, .g-set-row input { flex: 1 1 auto; min-width: 0; padding: 9px 12px; border: 2px solid #dde6f0; border-radius: 10px; font-weight: 700; font-size: 1em; box-sizing: border-box; }
+  [data-theme="dark"] .g-set-row select, [data-theme="dark"] .g-set-row input { background: #11161d; border-color: #2a323e; color: #eef2f7; }
   .g-set-label { font-weight: 700; margin-bottom: 8px; }
   .g-set-hint { color: #8a96a3; font-weight: 500; font-size: 0.85em; }
   .g-daygrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -6728,6 +6728,8 @@ function initScriptSwipeAndZoom(isPC) {
   [data-theme="dark"] .g-day { background: #11161d; border-color: #333d4a; color: #cbd3dd; }
   [data-theme="dark"] .g-day.on { background: #1e2c3d; color: #8cc6f0; border-color: #2b6aa0; }
   .g-day input { accent-color: var(--primary); }
+  /* 대기방을 넓게 — 과정·문제수·제한시간 라벨이 한 줄로 보이게 */
+  #gmOverlay .sm-panel.wait { max-width: 640px; width: 96%; }
   /* 게임 시작 시 큰 화면(앱처럼) */
   #gmOverlay .sm-panel.big { max-width: 720px; width: 96%; min-height: 88vh; display: flex; flex-direction: column; }
   #gmOverlay .sm-panel.big .sm-body { flex: 1; }
@@ -7161,6 +7163,22 @@ let renderedPhase = '';
 let iAmLeaving = false; // 내가 직접 나가는 경우 "방이 종료되었어요" 알림 표시 안 함
 let roomConnUnsub = null; // .info/connected 구독(모바일 재접속 복구용)
 let lastMyScore = 0;      // 재접속 시 점수 복원용 마지막 점수
+let gameWasPlaying = false; // playing 진입 감지(전체화면 전환 1회용)
+let gameFsArmed = false;    // 참가자 첫 터치에서 전체화면 예약 여부
+
+// 게임 시작 시 전체화면 전환. 방장은 시작 버튼(제스처)으로 즉시,
+// 참가자는 시작이 원격이라 제스처가 없을 수 있어 다음 첫 터치에서 전환되도록 예약.
+function enterGameFullscreen(){
+  try { if (window.enterAppFullscreen) window.enterAppFullscreen(); } catch(e){}
+  if (!gameFsArmed){
+    gameFsArmed = true;
+    const once = () => {
+      document.removeEventListener('pointerdown', once);
+      try { if (window.enterAppFullscreen && !(window.isFullscreen && window.isFullscreen())) window.enterAppFullscreen(); } catch(e){}
+    };
+    document.addEventListener('pointerdown', once, { once: true });
+  }
+}
 
 // 방의 제한시간(ms) — 방장이 설정한 값, 없으면 기본 2분
 function qTimeOf(room){ const t = room && room.qTime; return (typeof t === 'number' && t >= 5000) ? t : Q_TIME; }
@@ -7333,6 +7351,7 @@ function cleanupRoomState(){
   if (roomConnUnsub){ try { roomConnUnsub(); } catch(e){} roomConnUnsub = null; }
   clearTimeout(hostTimer); clearInterval(tickTimer);
   gameCode = null; gameRoom = null; scheduledQ = -1; myAnsweredQ = -1; earlyQ = -1; renderedQ = -1; renderedPhase = ''; iAmLeaving = false; lastMyScore = 0;
+  gameWasPlaying = false; gameFsArmed = false;
   window.__gameActive = false;
 }
 
@@ -7351,10 +7370,16 @@ function onRoomUpdate(){
   if (!room) return;
   // 재접속 복구를 위해 내 최신 점수 기억
   if (room.players && currentUser && room.players[currentUser.uid]) lastMyScore = room.players[currentUser.uid].score || 0;
-  // 게임이 시작되면 화면을 크게(앱처럼)
+  // 게임이 시작되면 화면을 크게(앱처럼) + 실제 전체화면 전환
   const ov = document.getElementById('gmOverlay');
   const panel = ov && ov.querySelector('.sm-panel');
-  if (panel) panel.classList.toggle('big', room.state === 'playing' || room.state === 'finished');
+  if (panel){
+    panel.classList.toggle('big', room.state === 'playing' || room.state === 'finished');
+    panel.classList.toggle('wait', room.state === 'waiting');
+  }
+  const startedNow = room.state === 'playing' && !gameWasPlaying;
+  gameWasPlaying = room.state === 'playing';
+  if (startedNow) enterGameFullscreen();
   if (room.state === 'waiting') renderRoom();
   else if (room.state === 'playing'){ renderPlaying(); hostSchedule(); }
   else if (room.state === 'finished'){ renderResult(); clearInterval(tickTimer); }
