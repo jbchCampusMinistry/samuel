@@ -220,8 +220,20 @@
     [data-theme="dark"] .menu-row-desc { color: #93a0b0; }
     [data-theme="dark"] .menu-row-arrow { color: #5b6675; }
 
+    /* [신규] 홈 - 나의 진도 + 공지사항 2단 배치 */
+    .home-bottom-row { display: grid; grid-template-columns: minmax(0, 4.5fr) minmax(0, 7.5fr); gap: 16px; align-items: start; margin-top: 24px; }
+    .home-bottom-row > .home-progress, .home-bottom-row > .home-notice { margin-top: 0; }
+    @media (max-width: 760px) { .home-bottom-row { grid-template-columns: 1fr; } }
+    /* 좁은 좌측 칸에 맞춰 나의 진도 컴팩트화 */
+    .home-bottom-row > .home-progress .hp-head .hp-title { font-size: 0.98em; }
+    .home-bottom-row > .home-progress .hp-overall { font-size: 0.84em; margin-bottom: 11px; }
+    .home-bottom-row > .home-progress .hp-row { gap: 7px; margin-bottom: 7px; }
+    .home-bottom-row > .home-progress .hp-day { flex: 0 0 42px; font-size: 0.82em; }
+    .home-bottom-row > .home-progress .hp-bar { height: 8px; }
+    .home-bottom-row > .home-progress .hp-num { flex: 0 0 72px; font-size: 0.76em; }
+
     /* [신규] 홈 - 나의 진도 패널 */
-    .home-progress { margin-top: 28px; background: #fff; border: 1px solid #eef1f5; border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 6px 18px rgba(15,30,60,0.06); }
+    .home-progress { margin-top: 28px; background: #fff; border: 1px solid #eef1f5; border-radius: 18px; padding: 15px 15px 11px; box-shadow: 0 6px 18px rgba(15,30,60,0.06); }
     .hp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
     .hp-head .hp-title { font-weight: 800; color: var(--secondary); font-size: 1.05em; }
     .hp-head select { width: auto; padding: 6px 10px; border-radius: 8px; border: 1.5px solid #e1e6ec; font-size: 0.85em; font-weight: 700; }
@@ -262,8 +274,9 @@
     .hn-item.open .hn-arrow { transform: rotate(90deg); }
     .hn-item-body { display: none; padding: 0 13px 13px; font-size: 0.88em; color: #5b6675; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
     .hn-item.open .hn-item-body { display: block; }
-    .hn-orig { display: inline-block; margin-top: 10px; color: var(--primary); font-weight: 700; text-decoration: none; font-size: 0.9em; }
-    .hn-orig:hover { text-decoration: underline; }
+    .hn-orig { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; padding: 10px 14px; color: #fff; background: var(--primary); font-weight: 700; text-decoration: none; font-size: 0.92em; border-radius: 10px; }
+    .hn-orig:hover { filter: brightness(1.05); text-decoration: none; }
+    .hn-orig:active { transform: translateY(1px); }
     .hn-empty, .hn-loading { color: #9aa6b3; font-size: 0.9em; text-align: center; padding: 12px 0; }
 
     [data-theme="dark"] .home-notice { background: #1b212b; border-color: #2a323e; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
@@ -1597,14 +1610,6 @@
         <main class="scroll-content" id="scrollContent">
             <div class="container">
                 <div id="stepHome" class="active no-print">
-                    <div class="home-notice" id="homeNotice" style="display:none;">
-                        <div class="hn-head">
-                            <span class="hn-title">📢 교회 공지사항</span>
-                            <button class="hn-refresh" onclick="loadChurchNotices(true)" title="새로고침">⟳</button>
-                        </div>
-                        <div class="hn-list" id="hnList"><div class="hn-loading">공지를 불러오는 중…</div></div>
-                    </div>
-
                     <div class="main-menu-list">
                         <button class="menu-row study" onclick="selectRootMode('study')">
                             <span class="menu-row-ico">📖</span>
@@ -1643,16 +1648,26 @@
                         <div id="verseSearchResults" class="vs-results"></div>
                     </div>
 
-                    <div class="home-progress">
-                        <div class="hp-head">
-                            <span class="hp-title">📊 나의 진도</span>
-                            <select id="progressCourse" onchange="renderHomeProgress()">
-                                <option value="1">1과정</option><option value="2">2과정</option><option value="3">3과정</option><option value="4">4과정</option>
-                            </select>
+                    <div class="home-bottom-row">
+                        <div class="home-progress">
+                            <div class="hp-head">
+                                <span class="hp-title">📊 나의 진도</span>
+                                <select id="progressCourse" onchange="renderHomeProgress()">
+                                    <option value="1">1과정</option><option value="2">2과정</option><option value="3">3과정</option><option value="4">4과정</option>
+                                </select>
+                            </div>
+                            <div id="hpOverall" class="hp-overall"></div>
+                            <div id="hpBody"></div>
+                            <div style="text-align:right;"><button class="hp-reset" onclick="resetProgress()">기록 초기화</button></div>
                         </div>
-                        <div id="hpOverall" class="hp-overall"></div>
-                        <div id="hpBody"></div>
-                        <div style="text-align:right;"><button class="hp-reset" onclick="resetProgress()">기록 초기화</button></div>
+
+                        <div class="home-notice" id="homeNotice" style="display:none;">
+                            <div class="hn-head">
+                                <span class="hn-title">📢 대학선교부 공지사항</span>
+                                <button class="hn-refresh" onclick="loadChurchNotices(true)" title="새로고침">⟳</button>
+                            </div>
+                            <div class="hn-list" id="hnList"><div class="hn-loading">공지를 불러오는 중…</div></div>
+                        </div>
                     </div>
                 </div>
                 <div id="stepStats" class="no-print">
