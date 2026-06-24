@@ -6991,7 +6991,10 @@ function setupPresence(uid){
 }
 
 // 비정상 종료로 남은 기록 대비: 최근 활동 시간이 있는 것만 카운트(2분 이내)
+let countSubscribed = false;
 function subscribeCount(){
+  if (countSubscribed) return;
+  countSubscribed = true;
   onValue(ref(db, 'status'), (snap) => {
     const now = Date.now();
     let n = 0;
@@ -7002,6 +7005,10 @@ function subscribeCount(){
     });
     const el = document.getElementById('onlineCount');
     if (el) el.textContent = '👥 ' + n;
+  }, (err) => {
+    // 아직 인증 전이라 읽기가 거부되면 리스너가 취소됨 → 잠시 뒤 재구독
+    countSubscribed = false;
+    setTimeout(() => { if (currentUser) subscribeCount(); }, 1500);
   });
 }
 
@@ -7040,6 +7047,7 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
   setupPresence(user.uid);
+  subscribeCount(); // 인증된 뒤에 구독해야 status 읽기 권한 통과(새 도메인은 캐시된 세션이 없어 더 중요)
   if (!user.isAnonymous){
     let snap = null;
     try {
@@ -7062,7 +7070,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-subscribeCount();
+// subscribeCount()는 onAuthStateChanged에서 인증 완료 후 호출함(권한 거부로 리스너가 취소되는 것 방지)
 
 // ---- 닉네임 등록/검증 ----
 async function claimNickname(raw){
