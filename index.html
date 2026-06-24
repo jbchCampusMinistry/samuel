@@ -6990,22 +6990,29 @@ function setupPresence(uid){
   }
 }
 
-// 비정상 종료로 남은 기록 대비: 최근 활동 시간이 있는 것만 카운트(2분 이내)
+// 집계 기준: 이 시간 안에 살아있다는 신호(하트비트)가 있어야 접속으로 셈. 하트비트보다 넉넉하게.
+const PRESENCE_WINDOW = 60000; // 60초
 let countSubscribed = false;
+let lastStatusEntries = [];    // 마지막으로 받은 status 목록(시간 경과 재계산용)
+let gotStatus = false;         // 첫 데이터 받기 전엔 '–' 유지
+// 시간값 없는 유령 제외 + 최근 신호만 집계
+function renderCount(){
+  if (!gotStatus) return;
+  const now = Date.now();
+  let n = 0;
+  for (const e of lastStatusEntries){ if (typeof e.ts === 'number' && (now - e.ts) < PRESENCE_WINDOW) n++; }
+  const el = document.getElementById('onlineCount');
+  if (el) el.textContent = '👥 ' + n;
+}
 function subscribeCount(){
   if (countSubscribed) return;
   countSubscribed = true;
   onValue(ref(db, 'status'), (snap) => {
-    const now = Date.now();
-    let n = 0;
-    snap.forEach((child) => {
-      const v = child.val();
-      const ts = v && v.ts;
-      // 유효한 최근(2분 이내) 시간값이 있는 항목만 집계 — 시간값 없는 유령 항목 제외
-      if (typeof ts === 'number' && (now - ts) < 120000) n++;
-    });
-    const el = document.getElementById('onlineCount');
-    if (el) el.textContent = '👥 ' + n;
+    const arr = [];
+    snap.forEach((child) => { const v = child.val() || {}; arr.push({ ts: v.ts }); });
+    lastStatusEntries = arr;
+    gotStatus = true;
+    renderCount(); // 누가 들어오거나 나가면(데이터 변화) 즉시 반영 — 실시간
   }, (err) => {
     // 아직 인증 전이라 읽기가 거부되면 리스너가 취소됨 → 잠시 뒤 재구독
     countSubscribed = false;
@@ -7013,8 +7020,10 @@ function subscribeCount(){
   });
 }
 
-// 살아있음을 주기적으로 갱신(heartbeat)
-setInterval(() => { if (presenceUid) goOnline(); }, 45000);
+// 살아있음을 주기적으로 갱신(heartbeat) — 25초마다
+setInterval(() => { if (presenceUid) goOnline(); }, 25000);
+// 데이터 변화가 없어도, 시간이 지나 오래된(끊긴) 항목이 빠지는 것을 실시간 반영(3초마다 재계산)
+setInterval(renderCount, 3000);
 
 // ===== 관리자 전용 접속자 디버그 =====
 // 관리자 구글 이메일(소문자). 여러 명이면 콤마로 추가: ['a@gmail.com','b@gmail.com']
@@ -7038,7 +7047,7 @@ async function showAdminPresence(){
       const v = c.val() || {};
       const ts = v.ts;
       const hasTs = typeof ts === 'number';
-      const isCounted = hasTs && (now - ts) < 120000;
+      const isCounted = hasTs && (now - ts) < PRESENCE_WINDOW;
       if (isCounted) counted++;
       rows.push({ nick: nickMap[c.key] || '(익명·기록 없음)', uid: c.key, ageS: hasTs ? Math.round((now - ts) / 1000) : null, hasTs, isCounted });
     });
@@ -7179,7 +7188,12 @@ function ensureModals(){
   document.body.appendChild(ov);
 
   document.getElementById('nkChangeBtn').onclick = () => showEditView(false);
-  document.getElementById('nkLogoutBtn').onclick = async () => { closeModal(); try { await signOut(auth); } catch(e){ alert('로그아웃 실패: ' + (e.message||e)); } };
+  document.getElementById('nkLogoutBtn').onclick = async () => {
+    closeModal();
+    // 신원이 바뀌기 전(아직 이 계정으로 인증된 상태)에 내 접속 항목을 직접 제거 → 로그아웃 후 유령으로 남아 +1 되는 것 방지
+    try { const pu = presenceUid; if (pu) { onDisconnect(ref(db, 'status/' + pu)).cancel(); presenceUid = null; await remove(ref(db, 'status/' + pu)); } } catch(e){}
+    try { await signOut(auth); } catch(e){ alert('로그아웃 실패: ' + (e.message||e)); }
+  };
   document.getElementById('nkCloseBtn').onclick = closeModal;
   document.getElementById('nkCancelBtn').onclick = closeModal;
   document.getElementById('nkSaveBtn').onclick = saveNickname;
@@ -7901,6 +7915,8 @@ window.samuelToggleAuth = async function(){
     return;
   }
   const wasFs = !!(window.isFullscreen && window.isFullscreen()); // 로그인 전 전체화면 여부
+  // 구글로 바뀌기 전(아직 익명으로 인증된 상태)에 익명 접속 항목을 제거 → 로그인 후 유령으로 남아 +1 되는 것 방지
+  try { const pu = presenceUid; if (pu) { onDisconnect(ref(db, 'status/' + pu)).cancel(); presenceUid = null; await remove(ref(db, 'status/' + pu)); } } catch(e){}
   try {
     await signInWithPopup(auth, provider);
     if (wasFs) restoreFullscreen(); // 팝업으로 깨진 전체화면 복원
