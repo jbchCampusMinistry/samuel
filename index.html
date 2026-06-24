@@ -6732,6 +6732,12 @@ function initScriptSwipeAndZoom(isPC) {
   #gmOverlay .sm-panel.wait { max-width: 640px; width: 96%; }
   /* 게임 시작 시 큰 화면(앱처럼) */
   #gmOverlay .sm-panel.big { max-width: 720px; width: 96%; min-height: 88vh; display: flex; flex-direction: column; }
+  /* 게임 진행/결과: 화면 전체를 꽉 채우는 메인 화면으로 전환 */
+  #gmOverlay.full { padding: 0; background: #fff; align-items: stretch; justify-content: stretch; }
+  [data-theme="dark"] #gmOverlay.full { background: #14181f; }
+  #gmOverlay.full .sm-panel.big { max-width: none; width: 100%; min-height: 100vh; min-height: 100dvh; max-height: none; border-radius: 0; box-shadow: none; }
+  #gmOverlay.full .sm-panel.big .sm-head { border-radius: 0; }
+  #gmOverlay.full .sm-panel.big .sm-body { max-width: 760px; width: 100%; margin: 0 auto; }
   #gmOverlay .sm-panel.big .sm-body { flex: 1; }
   #gmOverlay .sm-panel.big .g-topic { font-size: 1.3em; }
   #gmOverlay .sm-panel.big .g-ref { font-size: 1.6em; }
@@ -7224,7 +7230,7 @@ async function closeGame(){
   }
   leaveRoom();
   const ov = document.getElementById('gmOverlay');
-  if (ov){ ov.classList.remove('show'); const p = ov.querySelector('.sm-panel'); if (p) p.classList.remove('big'); }
+  if (ov){ ov.classList.remove('show', 'full'); const p = ov.querySelector('.sm-panel'); if (p) p.classList.remove('big', 'wait'); }
 }
 
 window.samuelOpenGame = function(){
@@ -7334,7 +7340,7 @@ function enterRoom(code){
       gameRoom = null;
       const ov = document.getElementById('gmOverlay');
       if (ov && ov.classList.contains('show')){
-        const p = ov.querySelector('.sm-panel'); if (p) p.classList.remove('big');
+        ov.classList.remove('full'); const p = ov.querySelector('.sm-panel'); if (p) p.classList.remove('big', 'wait');
         if (!iAmLeaving) smAlert('방이 종료되었어요.');
         renderLobby(); cleanupRoomState();
       }
@@ -7373,10 +7379,12 @@ function onRoomUpdate(){
   // 게임이 시작되면 화면을 크게(앱처럼) + 실제 전체화면 전환
   const ov = document.getElementById('gmOverlay');
   const panel = ov && ov.querySelector('.sm-panel');
+  const inGame = room.state === 'playing' || room.state === 'finished';
   if (panel){
-    panel.classList.toggle('big', room.state === 'playing' || room.state === 'finished');
+    panel.classList.toggle('big', inGame);
     panel.classList.toggle('wait', room.state === 'waiting');
   }
+  if (ov) ov.classList.toggle('full', inGame); // 진행/결과는 화면 전체 차지
   const startedNow = room.state === 'playing' && !gameWasPlaying;
   gameWasPlaying = room.state === 'playing';
   if (startedNow) enterGameFullscreen();
