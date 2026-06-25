@@ -3182,14 +3182,16 @@ function renderNotices(items) {
             '<div class="hn-item-body">' + (body ? linkifyNotice(escHtml(body)) : '<i>내용 없음</i>') + '</div>' +
         '</div>';
     }).join('');
-    // 첫 공지는 펼쳐서 보여줌
-    const first = document.getElementById('hn-0');
-    if (first) first.classList.add('open');
+    // 처음에는 모든 공지를 접어 둠(첫 글도 닫힘)
 }
 
 function toggleNotice(i) {
     const el = document.getElementById('hn-' + i);
-    if (el) el.classList.toggle('open');
+    if (!el) return;
+    const willOpen = !el.classList.contains('open');
+    // 아코디언: 다른 공지를 열면 이전에 열려 있던 공지는 자동으로 닫힘
+    document.querySelectorAll('#hnList .hn-item.open').forEach(it => { if (it !== el) it.classList.remove('open'); });
+    el.classList.toggle('open', willOpen);
 }
 
 function formatNoticeDate(s) {
