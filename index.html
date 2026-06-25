@@ -1630,7 +1630,7 @@
     <div id="sidebar">
         <div class="sidebar-top-fixed">
             <div class="sidebar-header" id="sidebarHeader">
-                <span class="drag-hint">⠿ 암송 도우미</span>
+                <span class="drag-hint"></span>
                 <div class="sidebar-controls">
                     <button onclick="setSidePos('L')" title="왼쪽에 붙이기">◀</button>
                     <button onclick="setSidePos('R')" title="오른쪽에 붙이기">▶</button>
@@ -1640,7 +1640,7 @@
         </div>
         <div class="sidebar-scroll">
             <div class="sidebar-select-area">
-                <input type="text" id="sidebarSearchInput" class="sidebar-search-input" placeholder="🔍 구절 검색 (장절·단어)" oninput="searchSidebar()">
+                <input type="text" id="sidebarSearchInput" class="sidebar-search-input" placeholder="🔍 구절 검색 " oninput="searchSidebar()">
                 <select id="sideCourseSelect" onchange="changeSidebarSelection()"><option value="1">1과정</option><option value="2">2과정</option><option value="3">3과정</option><option value="4">4과정</option></select>
                 <select id="sideDaySelect" onchange="changeSidebarSelection()">
                     <option value="">-- 일차 선택 --</option>
@@ -1694,17 +1694,17 @@
                         </button>
                         <button class="menu-row quiz" onclick="selectRootMode('quiz')">
                             <span class="menu-row-ico">✍️</span>
-                            <span class="menu-row-text"><span class="menu-row-title">암송 퀴즈</span><span class="menu-row-desc">외운 내용을 직접 입력해 확인</span></span>
+                            <span class="menu-row-text"><span class="menu-row-title">암송 퀴즈</span><span class="menu-row-desc">일차별 퀴즈</span></span>
                             <span class="menu-row-arrow">›</span>
                         </button>
                         <button class="menu-row plowing" onclick="selectRootMode('plowing')">
                             <span class="menu-row-ico">🌱</span>
-                            <span class="menu-row-text"><span class="menu-row-title">예시 밭갈이</span><span class="menu-row-desc">예시를 보며 필기하고 연습하기</span></span>
+                            <span class="menu-row-text"><span class="menu-row-title">예시 밭갈이</span><span class="menu-row-desc">예시밭갈이와 밭갈이 만들기</span></span>
                             <span class="menu-row-arrow">›</span>
                         </button>
                         <button class="menu-row stats" onclick="selectRootMode('stats')">
                             <span class="menu-row-ico">🙋</span>
-                            <span class="menu-row-text"><span class="menu-row-title">마이페이지</span><span class="menu-row-desc">수료 점수 계산기와 나의 학습 기록</span></span>
+                            <span class="menu-row-text"><span class="menu-row-title">마이페이지</span><span class="menu-row-desc">나의 학습 기록과 수료 점수 계산</span></span>
                             <span class="menu-row-arrow">›</span>
                         </button>
                         <button class="menu-row rank" onclick="samuelOpenLeaderboard()">
@@ -1714,7 +1714,7 @@
                         </button>
                         <button class="menu-row battle" onclick="samuelOpenGame()">
                             <span class="menu-row-ico">⚔️</span>
-                            <span class="menu-row-text"><span class="menu-row-title">암송 게임</span><span class="menu-row-desc">방을 만들어 친구들과 실시간 암송 대결 (과정 달라도 OK)</span></span>
+                            <span class="menu-row-text"><span class="menu-row-title">암송 게임</span><span class="menu-row-desc">형제 자매님들과 실시간 암송 대결</span></span>
                             <span class="menu-row-arrow">›</span>
                         </button>
                     </div>
@@ -7716,7 +7716,7 @@ function renderRoom(){
     '<div class="g-set-row"><span>내 과정</span>' +
       '<select id="gmMyCourse">' + [1,2,3,4].map(c => '<option value="' + c + '"' + (c === myC ? ' selected' : '') + '>' + c + '과정</option>').join('') + '</select>' +
     '</div>' +
-    '<div class="g-set-hint">방장이 고른 일차에서 내 과정에 맞는 암송이 나와요.</div></div>';
+    '<div class="g-set-hint">고른 일차에서 내 과정에 맞는 암송이 나와요.</div></div>';
 
   // 출제 설정(방장: 일차·문제수·제한시간) / 표시(참가자)
   let setHtml;
@@ -7743,7 +7743,7 @@ function renderRoom(){
 
   gmBody().innerHTML =
     '<div class="g-code-big">' + gameCode + '</div>' +
-    '<div class="g-code-label">이 코드를 친구에게 알려주세요</div>' +
+    '<div class="g-code-label">입장 코드 입니다</div>' +
     '<div class="g-players">' + plist + '</div>' +
     myCourseHtml +
     setHtml +
