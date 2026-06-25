@@ -1377,7 +1377,7 @@
     .streak-label { font-weight: 700; color: #7f8c8d; font-size: 0.95em; }
     .streak-best { color: #9aa6b2; font-size: 0.85em; margin-top: 6px; }
 
-    .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .stat-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
     @media (max-width: 620px) { .stat-cards { grid-template-columns: repeat(2, 1fr); } }
     .stat-card {
         background: #fff; border: 1px solid #eef1f5; border-radius: 16px; padding: 16px 14px;
@@ -7019,7 +7019,9 @@ function buildSnapshot(){
 async function uploadSnapshot(){
   if (!currentUser || currentUser.isAnonymous) return;
   try {
-    await set(ref(db, 'users/' + currentUser.uid), { store: buildSnapshot(), updatedAt: serverTimestamp() });
+    // [수정] set은 users/{uid} 노드 전체를 덮어써 nickname·course 필드를 지워버림.
+    // update로 store·updatedAt만 갱신해 닉네임/과정이 로그아웃·재로그인 후에도 유지되게 함.
+    await update(ref(db, 'users/' + currentUser.uid), { store: buildSnapshot(), updatedAt: serverTimestamp() });
   } catch(e){ console.warn('동기화 업로드 실패', e); }
   publishLeaderboard();
 }
