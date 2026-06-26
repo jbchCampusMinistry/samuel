@@ -2681,31 +2681,36 @@ function exitAppFullscreen() {
 function toggleFullscreen() { isFullscreen() ? exitAppFullscreen() : enterAppFullscreen(); }
 
 // [신규] 몰입 모드에서 상단·하단 바를 잠깐 표시(스크롤 불가 화면·진입 시 등)
+// edges: 'top' | 'bottom' | (생략/'both') → 해당 바를 띄우고 잠시 후 자동으로 숨김
 let chromeRevealTimer = null;
-function revealChrome() {
+function revealChrome(edges) {
     if (!document.body.classList.contains('study-immersive')) return;
-    document.body.classList.add('reveal-top', 'reveal-bottom');
+    const showTop = !edges || edges === 'both' || edges === 'top';
+    const showBottom = !edges || edges === 'both' || edges === 'bottom';
+    document.body.classList.toggle('reveal-top', showTop);
+    document.body.classList.toggle('reveal-bottom', showBottom);
     if (chromeRevealTimer) clearTimeout(chromeRevealTimer);
     chromeRevealTimer = setTimeout(() => document.body.classList.remove('reveal-top', 'reveal-bottom'), 2800);
 }
-// 스크롤 시 바 표시 규칙:
-//  - 한 화면(스크롤 불가): 스크롤/스와이프하면 상·하 바 표시
-//  - 확대(스크롤 가능): 최상단=상단 바, 최하단=하단 바, 중간=둘 다 숨김
-//  - 어느 경우든 스크롤이 멈추면 잠시 후 자동으로 사라짐(확대 시 상단 바가 stuck 되던 문제 방지)
-function onStudyChromeScroll() {
+
+// 바 표시 규칙(갤럭시 빠른 설정처럼 '끝에서 한 번 더 당겨야' 나옴):
+//  - 끝에 도달한 것만으로는 안 띄움 → 이미 최상단/최하단인 상태에서 추가로 당겨야 표시
+//  - 한 화면(스크롤 불가): 위/아래로 명확히 스와이프하면 방향에 맞는 바 표시
+const CHROME_PULL = 50;   // 끝에서 추가로 당겨야 하는 거리(px)
+// 데스크톱 휠 오버스크롤 — wheel은 스크롤이 반영되기 '전' 위치를 읽으므로 끝에서 한 번 더 굴려야 끝값이 됨
+function onStudyChromeWheel(e) {
     if (!document.body.classList.contains('study-immersive')) return;
-    if (typeof gPinch !== 'undefined' && gPinch) return;   // 핀치(확대) 중에는 바 안 띄움
+    if (e.ctrlKey) return;   // Ctrl+휠은 확대용
     const sc = document.getElementById('scrollContent');
     if (!sc) return;
     const scrollable = sc.scrollHeight > sc.clientHeight + 8;
     if (!scrollable) {
-        document.body.classList.add('reveal-top', 'reveal-bottom');
-    } else {
-        document.body.classList.toggle('reveal-top', sc.scrollTop <= 4);
-        document.body.classList.toggle('reveal-bottom', (sc.scrollTop + sc.clientHeight) >= (sc.scrollHeight - 4));
+        if (e.deltaY < -4) revealChrome('top');
+        else if (e.deltaY > 4) revealChrome('bottom');
+        return;
     }
-    if (chromeRevealTimer) clearTimeout(chromeRevealTimer);
-    chromeRevealTimer = setTimeout(() => document.body.classList.remove('reveal-top', 'reveal-bottom'), 1500);
+    if (sc.scrollTop <= 2 && e.deltaY < -4) revealChrome('top');
+    else if ((sc.scrollTop + sc.clientHeight) >= (sc.scrollHeight - 2) && e.deltaY > 4) revealChrome('bottom');
 }
 // 첫 사용자 동작에서 자동으로 전체화면 시도(브라우저 정책상 제스처 필요). iOS Safari는 미지원 → 홈화면 추가 권장.
 function armAutoFullscreen() {
@@ -3072,9 +3077,8 @@ function initApp() {
     // 몰입 모드: 스크롤/스와이프 제스처로 상단·하단 바 잠깐 표시
     const scEl = document.getElementById('scrollContent');
     if (scEl) {
-        scEl.addEventListener('wheel', onStudyChromeScroll, { passive: true });
-        scEl.addEventListener('scroll', onStudyChromeScroll, { passive: true });
-        scEl.addEventListener('touchmove', onStudyChromeScroll, { passive: true });
+        // 바 표시: 터치는 끝에서 당기는 제스처(studyGesture…), 데스크톱은 끝에서의 휠 오버스크롤로만
+        scEl.addEventListener('wheel', onStudyChromeWheel, { passive: true });
         // Ctrl+휠로 화면 확대/축소(트랙패드/마우스)
         scEl.addEventListener('wheel', e => {
             if (!e.ctrlKey || !document.body.classList.contains('study-immersive')) return;
@@ -5713,7 +5717,14 @@ function studyGestureDown(e) {
         gScroll = null;
     } else {
         const sc = document.getElementById('scrollContent');
-        gScroll = { id: e.pointerId, y0: e.clientY, top0: sc ? sc.scrollTop : 0, sc };
+        const top0 = sc ? sc.scrollTop : 0;
+        const scrollable = sc ? (sc.scrollHeight > sc.clientHeight + 8) : false;
+        gScroll = {
+            id: e.pointerId, y0: e.clientY, top0, sc, scrollable, revealed: false,
+            // 제스처 시작 시점에 이미 끝에 있었는지 → '끝에서 당기는' 동작만 바를 띄움
+            atTop: sc ? (top0 <= 2) : true,
+            atBottom: sc ? ((top0 + sc.clientHeight) >= (sc.scrollHeight - 2)) : true
+        };
     }
 }
 function studyGestureMove(e) {
@@ -5729,7 +5740,16 @@ function studyGestureMove(e) {
         }
         if (e.cancelable) e.preventDefault();
     } else if (gScroll && e.pointerId === gScroll.id && gScroll.sc) {
-        gScroll.sc.scrollTop = gScroll.top0 - (e.clientY - gScroll.y0);
+        const dy = e.clientY - gScroll.y0;   // 아래로 끌면 +, 위로 끌면 −
+        gScroll.sc.scrollTop = gScroll.top0 - dy;
+        // 끝에서 한 번 더 당겼을 때만 바 표시 (갤럭시 빠른 설정처럼)
+        if (!gScroll.revealed && !gPinch) {
+            if ((!gScroll.scrollable || gScroll.atTop) && dy > CHROME_PULL) {
+                revealChrome('top'); gScroll.revealed = true;
+            } else if ((!gScroll.scrollable || gScroll.atBottom) && dy < -CHROME_PULL) {
+                revealChrome('bottom'); gScroll.revealed = true;
+            }
+        }
         if (e.cancelable) e.preventDefault();
     }
 }
