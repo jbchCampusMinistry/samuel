@@ -6,7 +6,7 @@
 
 <link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#3498db">
+<meta name="theme-color" content="#0066cc">
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -27,13 +27,13 @@
     [data-theme="dark"] #appSplash { background: #14181f; }
 
     :root {
-        /* ── 브랜드 색 (에디토리얼·경건 · 단일 웜 골드 액센트) ── */
-        --primary: #b8862f;          /* Warm Gold — 채움/아이콘/큰 글리프 (히어로 촛불빛과 연결) */
-        --primary-strong: #9a6e1f;   /* 진한 골드 — hover/press */
-        --primary-text: #836016;     /* 라이트 위 작은 텍스트 링크용(대비 4.5:1↑ 확보) */
-        --primary-focus: #c0902c;    /* 키보드 포커스 링 */
-        --primary-on-dark: #e0b25c;  /* 다크 위 골드 링크 */
-        --on-primary: #1d1d1f;       /* 골드 버튼 위 텍스트 = 잉크(대비 5:1↑) */
+        /* ── 브랜드 색 (Apple 스펙 · 단일 Action Blue 액센트) ── */
+        --primary: #0066cc;          /* Action Blue — 모든 인터랙션의 단일 색 */
+        --primary-strong: #0058b3;   /* 진한 블루 — hover */
+        --primary-text: #0066cc;     /* 라이트 위 텍스트 링크 (대비 5:1↑) */
+        --primary-focus: #0071e3;    /* 키보드 포커스 링 (Focus Blue) */
+        --primary-on-dark: #2997ff;  /* 다크 위 링크 (Sky Link Blue) */
+        --on-primary: #ffffff;       /* 블루 버튼 위 텍스트 = 화이트 */
         --secondary: #1d1d1f;        /* Ink — 제목/본문 */
         --success: #2ecc71;
         --warning: #f39c12;
@@ -45,10 +45,10 @@
         /* ── 디자인 토큰 (Apple) ── */
         /* 표면 */
         --surface-card: #ffffff;          /* Pure White */
-        --canvas-parchment: #f7f5f1;      /* Warm Paper — 따뜻한 오프화이트 */
+        --canvas-parchment: #f5f5f7;      /* Parchment — Apple 시그니처 오프화이트 */
         --surface-pearl: #fafafc;         /* Pearl — 고스트 버튼 */
         --surface-tile-dark: #272729;     /* Near-Black Tile */
-        --chip-accent-bg: rgba(184,134,47,0.13);   /* 아이콘 칩 — 웜 골드 옅은 틴트 */
+        --chip-accent-bg: rgba(0,102,204,0.08);   /* 아이콘 칩 — Action Blue 옅은 틴트 */
         --chip-accent-fg: var(--primary);
         /* 경계 (Apple 헤어라인 — 선이라기보다 은은한 링) */
         --border-soft: rgba(0,0,0,0.10);
@@ -95,8 +95,8 @@
         --text-soft: #93a0b0;
         --text-faint: #93a0b0;
         --text-disabled: #6b7686;
-        --chip-accent-bg: rgba(224,178,92,0.18);
-        --chip-accent-fg: #e0b25c;
+        --chip-accent-bg: rgba(41,151,255,0.16);
+        --chip-accent-fg: #2997ff;
     }
     * { box-sizing: border-box; }
     
@@ -304,24 +304,22 @@
         background: linear-gradient(180deg, rgba(6,5,4,0.62) 0%, rgba(6,5,4,0.2) 32%, rgba(6,5,4,0) 56%); }
     .home-hero > * { position: relative; z-index: 1; }
     .home-hero h2 { margin: 0; font-size: clamp(32px, 5.4vw, 52px); font-weight: 600; line-height: 1.07; letter-spacing: -0.03em; color: #fff; text-shadow: 0 2px 30px rgba(0,0,0,0.55); }
-    /* 에디토리얼 골드 룰 */
-    .home-hero h2::after { content: ''; display: block; width: 60px; height: 2px; margin: 20px auto 0; background: var(--primary); border-radius: 2px; }
-    .home-hero p { margin: 18px auto 0; max-width: 540px; font-size: clamp(17px, 2.2vw, 20px); font-weight: 400; line-height: 1.4; letter-spacing: -0.012em; color: rgba(255,255,255,0.84); text-shadow: 0 1px 18px rgba(0,0,0,0.55); }
+    .home-hero p { margin: 16px auto 0; max-width: 540px; font-size: clamp(17px, 2.2vw, 20px); font-weight: 400; line-height: 1.4; letter-spacing: -0.012em; color: rgba(255,255,255,0.84); text-shadow: 0 1px 18px rgba(0,0,0,0.55); }
     .home-hero .hero-cta { margin-top: 28px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
     .home-hero .btn-pill.ghost { color: #fff; border-color: rgba(255,255,255,0.55); }
     .home-hero .btn-pill.ghost:hover { background: rgba(255,255,255,0.14); filter: none; }
     @media (max-width: 480px) { .home-hero { padding: 60px 16px 116px; border-radius: 22px; } }
 
-    /* 웜 골드 pill CTA — 골드 채움 + 잉크 텍스트(대비 5:1↑) */
+    /* Apple 시그니처 블루 pill CTA — 블루 채움 + 화이트 텍스트 */
     .btn-pill { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
         background: var(--primary); color: var(--on-primary); border: none; border-radius: var(--radius-pill);
-        padding: 12px 26px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; cursor: pointer;
-        transition: transform 0.2s, filter 0.2s; }
-    .btn-pill:hover { filter: brightness(1.07); }   /* 어둡게 X → 살짝 밝게: 잉크 텍스트 대비 유지(≥5:1) */
-    .btn-pill:active { transform: scale(0.95); }
+        padding: 12px 26px; font-size: 17px; font-weight: 400; letter-spacing: -0.01em; cursor: pointer;
+        transition: transform 0.2s, background 0.2s; }
+    .btn-pill:hover { background: var(--primary-strong); }   /* 살짝 진한 블루(화이트 텍스트 대비 유지) */
+    .btn-pill:active { transform: scale(0.95); }             /* Apple 공통 마이크로 인터랙션 */
     .btn-pill:focus-visible { outline: 2px solid var(--primary-focus); outline-offset: 2px; }
     .btn-pill.ghost { background: transparent; color: var(--primary-text); border: 1px solid var(--primary); }
-    .btn-pill.ghost:hover { background: rgba(184,134,47,0.08); }
+    .btn-pill.ghost:hover { background: rgba(0,102,204,0.06); }
     [data-theme="dark"] .btn-pill.ghost { color: var(--primary-on-dark); border-color: var(--primary-on-dark); }
 
     /* 위계: 메인 2개 카드(외우기·퀴즈)를 살짝 강조 */
@@ -406,7 +404,7 @@
     .home-search { margin-top: 22px; }
     .home-search input { width: 100%; padding: 12px 20px; height: 48px; border-radius: var(--radius-pill); border: 1px solid var(--border-input); background: var(--surface-card); color: var(--ink); font-size: 17px; letter-spacing: -0.01em; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
     .home-search input::placeholder { color: var(--text-soft); }
-    .home-search input:focus { border-color: var(--primary-focus); box-shadow: 0 0 0 3px rgba(184,134,47,0.20); }
+    .home-search input:focus { border-color: var(--primary-focus); box-shadow: 0 0 0 3px rgba(0,113,227,0.18); }
     .vs-results { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }
     .vs-count { font-size: 0.8em; color: #9aa6b3; font-weight: 700; padding: 2px 2px 0; }
     .vs-card { background: #fff; border: 1px solid #eef1f5; border-radius: 12px; padding: 12px 14px; box-shadow: 0 2px 8px rgba(15,30,60,0.05); }
@@ -2775,7 +2773,7 @@ function applyTheme(theme) {
     const isDark = theme === 'dark';
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', isDark ? '#14181f' : '#3498db');
+    if (meta) meta.setAttribute('content', isDark ? '#14181f' : '#0066cc');
     document.querySelectorAll('.theme-toggle-btn').forEach(b => b.textContent = isDark ? '☀️' : '🌙');
 }
 function initTheme() {
@@ -6995,7 +6993,7 @@ function initScriptSwipeAndZoom(isPC) {
   /* 게임 */
   .g-btn { display: block; width: 100%; box-sizing: border-box; padding: 15px; border: none; border-radius: 14px; font-size: 1.05em; font-weight: 800; cursor: pointer; margin-top: 10px; }
   .g-btn.primary { background: var(--primary); color: #fff; }
-  .g-btn.purple { background: linear-gradient(135deg, #8e2de2, #4a00e0); color: #fff; }
+  .g-btn.purple { background: var(--primary); color: #fff; }   /* 보라 그라데이션 → 단일 Action Blue */
   .g-btn.ghost { background: #eef2f7; color: #555; }
   [data-theme="dark"] .g-btn.ghost { background: #2a323e; color: #cbd3dd; }
   .g-btn:disabled { opacity: 0.5; cursor: default; }
