@@ -3105,7 +3105,16 @@ function initApp() {
     // [수정] mouseup/touchend/pointerup 3중 바인딩 → pointerup 하나로 통합 (중복 실행 방지)
     document.addEventListener('pointerup', handleTextSelection);
 
-    document.addEventListener('contextmenu', function(e) { e.preventDefault(); }, false);
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        // [신규] 크롬(안드로이드)은 S펜 버튼+필기를 contextmenu(보조 클릭)로 보고하는 경우가 많음
+        // → 펜으로 그리는 중이면 그 제스처를 즉시 지우개로 전환
+        if (isPenModeActive && isDrawTool(currentTool) && currentTool !== 'eraser' && isDrawing && !penForceErase) {
+            penForceErase = true;
+            curStroke = null;                 // 그리던 펜 획 폐기
+            if (drawCanvas) { const [px, py] = getDrawPos(e); eraserPath = [[px, py]]; redrawStrokes(); }
+        }
+    }, false);
 
     document.addEventListener('click', function(e) {
         // 툴바/팝업 바깥을 클릭하면 열린 옵션 팝업만 닫음(툴바는 항상 유지)
