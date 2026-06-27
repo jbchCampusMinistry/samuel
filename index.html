@@ -7289,6 +7289,16 @@ function applyRemote(store){
   try { if (typeof window.resetHomeProgressToMyCourse === 'function') window.resetHomeProgressToMyCourse(); else if (typeof window.renderHomeProgress === 'function') window.renderHomeProgress(); } catch(e){}
 }
 
+// [신규] 로그아웃 시 이전 계정의 로컬 동기데이터(필기·진도·통계·오답 등)를 비움.
+// 기기 설정(DEVICE_KEYS: 테마·툴바 위치 등)은 유지. 원본 removeItem 사용 → 업로드 트리거 방지.
+function clearSyncedLocal(){
+  clearTimeout(uploadTimer);
+  const toRemove = [];
+  for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); if (k && !DEVICE_KEYS.has(k)) toRemove.push(k); }
+  toRemove.forEach(k => _removeItem.call(localStorage, k));
+}
+window.clearSyncedLocal = clearSyncedLocal;
+
 // 접속자 수(프레즌스) — 리스너는 한 번만, 항상 현재 사용자만 표시
 let presenceUid = null;
 let connectedListenerSet = false;
@@ -7525,9 +7535,14 @@ function ensureModals(){
   document.getElementById('nkChangeBtn').onclick = () => showEditView(false);
   document.getElementById('nkLogoutBtn').onclick = async () => {
     closeModal();
+    // [신규] 로그아웃 전 — 현재 계정 데이터를 클라우드에 최신으로 저장(재로그인 시 그대로 복원)
+    try { await uploadSnapshot(); } catch(e){}
     // 신원이 바뀌기 전(아직 이 계정으로 인증된 상태)에 내 접속 항목을 직접 제거 → 로그아웃 후 유령으로 남아 +1 되는 것 방지
     try { const pu = presenceUid; if (pu) { onDisconnect(ref(db, 'status/' + pu)).cancel(); presenceUid = null; await remove(ref(db, 'status/' + pu)); } } catch(e){}
     try { await signOut(auth); } catch(e){ alert('로그아웃 실패: ' + (e.message||e)); }
+    // [신규] 이전 계정의 로컬 데이터(필기·진도 등) 비우고 새로고침 → 깨끗한 상태로 시작(공용 기기 보호)
+    try { clearSyncedLocal(); } catch(e){}
+    location.reload();
   };
   document.getElementById('nkCloseBtn').onclick = closeModal;
   document.getElementById('nkCancelBtn').onclick = closeModal;
