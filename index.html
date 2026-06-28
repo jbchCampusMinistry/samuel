@@ -1611,6 +1611,36 @@
     </button>
 
     <div style="position: relative;">
+        <button id="toolBtn-tape" class="flex-tool-btn" onclick="selectTool('tape')" title="가림 테이프 (글자를 덮어 가리고, 탭하면 잠깐 보임)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="9" width="19" height="6" rx="1.2"/><path d="M6 9 4.5 15"/><path d="M11.5 9 10 15"/><path d="M17 9l-1.5 6"/></svg>
+        </button>
+        <div id="popup-tape" class="tool-popup">
+            <div class="popup-row" style="font-size:.74rem; color:#8a93a0; justify-content:center; text-align:center; line-height:1.4; padding-bottom:4px;">글자 위에 그으면 가려지고,<br>가린 곳을 탭하면 잠깐 보여요</div>
+            <div class="popup-row opt-color-row"><span class="popup-label">색</span>
+                <div class="color-grid" id="tape-main-colors">
+                    <div class="color-dot selected" style="background:#cbd5e1" onclick="updateSettings('tape','color','#cbd5e1',this)"></div>
+                    <div class="color-dot" style="background:#ffffff;box-shadow:inset 0 0 0 1px #d0d0d0" onclick="updateSettings('tape','color','#ffffff',this)"></div>
+                    <div class="color-dot" style="background:#e8e0cf" onclick="updateSettings('tape','color','#e8e0cf',this)"></div>
+                    <div class="color-dot" style="background:#1a1a1a" onclick="updateSettings('tape','color','#1a1a1a',this)"></div>
+                    <div class="color-dot" style="background:#fde68a" onclick="updateSettings('tape','color','#fde68a',this)"></div>
+                    <div class="color-dot" style="background:#bbf7d0" onclick="updateSettings('tape','color','#bbf7d0',this)"></div>
+                    <div class="color-dot" style="background:#fbcfe8" onclick="updateSettings('tape','color','#fbcfe8',this)"></div>
+                    <div class="color-dot" style="background:#bfdbfe" onclick="updateSettings('tape','color','#bfdbfe',this)"></div>
+                </div>
+            </div>
+            <div class="popup-row"><span class="popup-label">굵기</span>
+                <input type="range" id="tape-width" class="width-slider" min="12" max="52" value="26" oninput="updateSettings('tape','width',this.value)">
+            </div>
+            <div class="popup-row"><span class="popup-label">직선 그리기</span>
+                <label class="toggle-switch"><input type="checkbox" id="tape-straight" onchange="updateSettings('tape','straight',this.checked)"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="popup-row" onclick="recoverAllTape()" style="cursor:pointer; justify-content:center; border-top:1px solid #eee; padding-top:10px; margin-top:2px;">
+                <span class="popup-label" style="color:#2563eb;"><svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>모두 다시 가리기</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="position: relative;">
         <button id="toolBtn-eraser" class="flex-tool-btn" onclick="selectTool('eraser')" title="지우개">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
         </button>
@@ -4043,6 +4073,7 @@ let currentTool = 'pen';
 let settings = {
     pen: { color: 'black', width: 3, straight: false },
     highlighter: { color: '#f1c40f', width: 18, straight: false, opacity: 0.32 },
+    tape: { color: '#cbd5e1', width: 26, straight: false },
     eraser: { mode: 'stroke', width: 14 }
 };
 let isPenModeActive = false;
@@ -5322,12 +5353,13 @@ let curStroke = null;
 let eraserPath = null;     // 지우개 제스처 경로(텍스트 하이라이트 제거용)
 let strokeBefore = null;   // 제스처 시작 시점 스냅샷
 let penForceErase = false; // [신규] S펜 버튼(또는 지우개 꼭지)을 누른 채 문지르는 동안 임시 지우개
+let downTapeIdx = -1;       // [가림 테이프] 누른 지점에 있던 테이프 인덱스(탭=가림/보임 토글 판정용)
 let drawKeyName = null;
 let drawDpr = 1;
 let drawResizeBound = false;
 
 const round1 = v => Math.round(v * 10) / 10;
-const isDrawTool = t => (t === 'pen' || t === 'highlighter' || t === 'eraser');
+const isDrawTool = t => (t === 'pen' || t === 'highlighter' || t === 'tape' || t === 'eraser');
 let curStraight = false;
 
 // 손가락 필기 허용 여부(기본 꺼짐) — 펜(스타일러스)·마우스로만 그림
@@ -5355,7 +5387,13 @@ function currentDrawKey() {
 }
 
 function loadStrokes(key) {
-    try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : []; } catch (e) { return []; }
+    try {
+        const r = localStorage.getItem(key);
+        const arr = r ? JSON.parse(r) : [];
+        // 가림 테이프는 다시 열 때 항상 '가린' 상태로 시작(암기용)
+        arr.forEach(s => { if (s && s.t === 'tape') s.r = false; });
+        return arr;
+    } catch (e) { return []; }
 }
 function saveStrokes() {
     if (!drawKeyName) return;
@@ -5398,7 +5436,9 @@ function applyStrokeStyle(s) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = (s.t === 'highlighter') ? (s.o != null ? s.o : 0.32) : 1;
+    ctx.globalAlpha = (s.t === 'highlighter') ? (s.o != null ? s.o : 0.32)
+                    : (s.t === 'tape' && s.r) ? 0.16   // 가림 테이프를 탭하면 반투명 → 글자 비침
+                    : 1;
     ctx.strokeStyle = s.c;
     ctx.fillStyle = s.c;
     ctx.lineWidth = s.w;
@@ -5441,6 +5481,34 @@ function distToSegment(px, py, ax, ay, bx, by) {
     let t = len2 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
     t = Math.max(0, Math.min(1, t));
     return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/* [가림 테이프] (x,y)에 닿은 맨 위 테이프 획의 인덱스(없으면 -1) */
+function findTapeAt(x, y) {
+    for (let i = strokes.length - 1; i >= 0; i--) {
+        const s = strokes[i];
+        if (!s || s.t !== 'tape') continue;
+        const p = s.p, thr = (s.w / 2) + 6;
+        if (p.length === 1) { if (Math.hypot(x - p[0][0], y - p[0][1]) <= thr) return i; continue; }
+        for (let j = 1; j < p.length; j++) {
+            if (distToSegment(x, y, p[j - 1][0], p[j - 1][1], p[j][0], p[j][1]) <= thr) return i;
+        }
+    }
+    return -1;
+}
+/* 획이 거의 제자리면(탭) 진짜 그리기 대신 토글로 처리하기 위한 이동량 */
+function strokeMoved(s) {
+    if (!s || !s.p || s.p.length < 2) return 0;
+    const a = s.p[0]; let m = 0;
+    for (const q of s.p) { const d = Math.hypot(q[0] - a[0], q[1] - a[1]); if (d > m) m = d; }
+    return m;
+}
+/* 가려진(보임 상태) 테이프를 모두 다시 가림 */
+function recoverAllTape() {
+    let ch = false;
+    strokes.forEach(s => { if (s && s.t === 'tape' && s.r) { s.r = false; ch = true; } });
+    if (ch) { saveStrokes(); redrawStrokes(); }
+    closeAllPopups();
 }
 
 function eraseAt(x, y) {
@@ -5548,6 +5616,8 @@ function onDrawDown(e) {
     try { drawCanvas.setPointerCapture(e.pointerId); } catch (_) {}
     const [x, y] = getDrawPos(e);
     strokeBefore = JSON.stringify(strokes);
+    // [가림 테이프] 누른 지점에 테이프가 있으면 기억 → 탭(거의 안 움직임)이면 가림/보임 토글
+    downTapeIdx = (currentTool !== 'eraser') ? findTapeAt(x, y) : -1;
     isDrawing = true;
     // [신규] S펜 버튼을 누른 채 그으면 도구와 상관없이 지우개로 동작
     penForceErase = isPenEraseSignal(e);
@@ -5631,20 +5701,32 @@ function onDrawUp(e) {
     const wasErasing = (currentTool === 'eraser' || penForceErase);
     if (wasErasing && eraserPath) { tryEraseTextAnnotations(eraserPath); eraserPath = null; }
     if (!wasErasing && curStroke && curStroke.p.length) {
-        if (curStraight) densifyStraight(curStroke);
-        strokes.push(curStroke);
-        // [신규] 글자 위에 그은 펜/형광펜이면 텍스트 하이라이트/밑줄로 변환 → 암송 도우미에도 반영
-        let textApplied = false;
-        if (curStroke.t === 'pen' || curStroke.t === 'highlighter') {
-            textApplied = tryApplyTextAnnotation(curStroke);
-        }
-        if (textApplied) {
-            strokes.pop();          // 텍스트에 반영했으니 캔버스 자유획은 제거(중복 방지)
-            strokeBefore = null;    // draw 히스토리 대신 text 히스토리로 기록됨
+        const isTap = strokeMoved(curStroke) < 6;   // 거의 안 움직였으면 '탭'
+        if (isTap && downTapeIdx >= 0 && strokes[downTapeIdx] && strokes[downTapeIdx].t === 'tape') {
+            // [가림 테이프] 가린 곳을 탭 → 가림/보임 토글(되돌리기 기록에는 안 남김)
+            strokes[downTapeIdx].r = !strokes[downTapeIdx].r;
+            saveStrokes();
+            strokeBefore = null;
+        } else if (isTap && currentTool === 'tape') {
+            // 빈 곳을 탭한 경우엔 테이프 점을 만들지 않음
+            strokeBefore = null;
         } else {
-            logStroke();            // 빈 곳 자유필기 → 통계만 누적
+            if (curStraight) densifyStraight(curStroke);
+            strokes.push(curStroke);
+            // [신규] 글자 위에 그은 펜/형광펜이면 텍스트 하이라이트/밑줄로 변환 → 암송 도우미에도 반영
+            let textApplied = false;
+            if (curStroke.t === 'pen' || curStroke.t === 'highlighter') {
+                textApplied = tryApplyTextAnnotation(curStroke);
+            }
+            if (textApplied) {
+                strokes.pop();          // 텍스트에 반영했으니 캔버스 자유획은 제거(중복 방지)
+                strokeBefore = null;    // draw 히스토리 대신 text 히스토리로 기록됨
+            } else {
+                logStroke();            // 빈 곳 자유필기 → 통계만 누적
+            }
         }
     }
+    downTapeIdx = -1;
     curStroke = null;
     curStraight = false;
     penForceErase = false;
