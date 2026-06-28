@@ -1695,9 +1695,6 @@
     <div class="popup-row"><span class="popup-label">직선 그리기</span>
         <label class="toggle-switch"><input type="checkbox" id="opt-straight" onchange="updateActivePreset('straight', this.checked)"><span class="toggle-slider"></span></label>
     </div>
-    <div class="popup-row"><span class="popup-label">손가락으로도 그리기</span>
-        <label class="toggle-switch"><input type="checkbox" class="finger-draw-check" onchange="toggleFingerDraw(this.checked)"><span class="toggle-slider"></span></label>
-    </div>
     <div class="popup-row" id="opt-tape-hint" style="display:none; font-size:.74rem; color:#8a93a0; justify-content:center; text-align:center; line-height:1.4;">글자 위에 그으면 가려지고,<br>가린 곳을 탭(클릭)하면 잠깐 보여요</div>
     <div class="popup-row" id="opt-recover-row" onclick="recoverAllTape()" style="display:none; cursor:pointer; justify-content:center; border-top:1px solid #eee; padding-top:10px;">
         <span class="popup-label" style="color:#2563eb;"><svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>모두 다시 가리기</span>
@@ -4654,11 +4651,13 @@ function addNewPen() {
 }
 function setPresetType(tool) {
     const p = activePreset(); if (!p) return;
+    const prevTool = p.tool;
     p.tool = tool;
     if (tool === 'highlighter') { if (p.opacity == null) p.opacity = 0.32; if (!p.width || p.width < 8 || p.width > 40) p.width = 18; }
     else if (tool === 'tape') {
         if (!p.width || p.width < 12) p.width = 26;       // 테이프는 두툼하게
         if (p.color === '#1a1a1a' || p.color === 'black') p.color = '#cbd5e1'; // 글자색이면 가림용 회색으로
+        if (prevTool !== 'tape') p.straight = true;       // 테이프는 기본 직선 그리기 ON(원하면 토글로 끔)
     }
     else { if (p.width > 14) p.width = 3; }
     applyPresetToSettings(p);
