@@ -525,6 +525,10 @@
     body.study-immersive #scrollContent { justify-content: safe center; overflow: hidden; padding-top: 12px; padding-bottom: 12px; }
     body.study-immersive .flex-toolbar { z-index: 3100; }   /* 바(z3000)가 나타나도 툴바/네비/팝업은 가려지지 않게 */
     body.study-immersive .tool-popup { z-index: 3200; }
+    /* 대본 뷰어(#stepScriptViewer z3000)에서도 필기 툴바·팝업이 가려지지 않게(암송 외우기와 동일) */
+    body.sd-open .flex-toolbar { z-index: 3100; }
+    body.sd-open .tool-popup { z-index: 3200; }
+    body.sd-open .expanded-palette { z-index: 3200; }
     /* 본문이 화면보다 크면(확대됨) 그때만 스크롤 — flex-start로 위에서부터(가운데정렬 빈공간 제거),
        하단 여백 최소화해 '종이(본문) 끝'까지만 내려가게(그 아래 그라데이션 빈영역으로 안 내려감) */
     body.study-zoomscroll #scrollContent { overflow-y: auto; justify-content: flex-start; padding-bottom: 6px; }
@@ -1363,6 +1367,11 @@
     .sd-viewport.sd-fit .sd-fitrow .sd-page.sd-2col .sd-sec-head { break-after: avoid; }
     .sd-viewport.sd-fit .sd-fig { max-width: 100%; }
 
+    /* [대본 이미지] 한 일차 = 이미지 한 장. 페이지=이미지 크기(패딩·2단 없음) → 모든 일차 동일 비율로 맞춰짐 */
+    .sd-page.sd-imgpage { padding: 0 !important; background: #fff; overflow: hidden; border-radius: 10px; }
+    .sd-page.sd-imgpage.sd-2col { column-count: 1 !important; }
+    .sd-page.sd-imgpage img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+
     /* [신규] 대본 필기 캔버스 — 암송 외우기 엔진(#drawingCanvas)과 동일 동작. fitrow 안이라 본문과 함께 스케일됨 */
     #sdDrawCanvas {
         position: absolute; top: 0; left: 0; z-index: 50;
@@ -1375,7 +1384,7 @@
 
     /* [신규] 대본 확대/축소 + 자물쇠 컨트롤 (암송 외우기와 동일 UX) */
     #sdZoomCtl {
-        position: fixed; top: 8px; right: 118px; z-index: 3600;
+        position: fixed; bottom: 22px; right: 18px; z-index: 3600;
         display: none; align-items: center; gap: 2px;
         background: rgba(255,255,255,0.95); border: 1px solid rgba(0,0,0,0.08);
         box-shadow: 0 4px 16px rgba(15,30,60,0.15); border-radius: 999px; padding: 3px 5px;
@@ -1567,6 +1576,10 @@
     .mp-nick { font-size: 1.3em; font-weight: 800; color: var(--secondary); }
     .mp-course { font-size: 0.82em; font-weight: 800; color: #fff; background: var(--primary); border-radius: 999px; padding: 4px 12px; }
     [data-theme="dark"] .mp-nick { color: #eef2f7; }
+    .mp-edit-btn { margin-left: auto; font-size: 0.82em; font-weight: 700; color: var(--primary); background: transparent;
+        border: 1.5px solid var(--primary); border-radius: 999px; padding: 5px 13px; cursor: pointer; white-space: nowrap; }
+    .mp-edit-btn:hover { background: var(--primary); color: #fff; }
+    [data-theme="dark"] .mp-edit-btn { border-color: #5aa9e6; color: #8cc6f0; }
 
     /* 수료 점수 계산기 */
     .exam-card { background: #fff; border: 1px solid #eef1f5; border-radius: 16px; padding: 18px; margin-bottom: 18px; box-shadow: 0 6px 18px rgba(15,30,60,0.06); }
@@ -1905,11 +1918,6 @@
                         <button class="menu-row script" onclick="selectRootMode('script')">
                             <span class="menu-row-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
                             <span class="menu-row-text"><span class="menu-row-title">대본 보기</span><span class="menu-row-desc">일차별 성경강연회 스토리보드(대본)</span></span>
-                            <span class="menu-row-arrow">›</span>
-                        </button>
-                        <button class="menu-row stats" onclick="selectRootMode('stats')">
-                            <span class="menu-row-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-                            <span class="menu-row-text"><span class="menu-row-title">마이페이지</span><span class="menu-row-desc">나의 학습 기록과 수료 점수 계산</span></span>
                             <span class="menu-row-arrow">›</span>
                         </button>
                         <button class="menu-row rank" onclick="samuelOpenLeaderboard()">
@@ -3246,7 +3254,7 @@ function renderStats() {
     const mpC = parseInt(window.myCourse, 10);
     const mpCourse = [1, 2, 3, 4].includes(mpC) ? mpC + '과정' : '';
     const profileHtml = mpNick
-        ? `<div class="mypage-profile"><span class="mp-nick">${escHtml(mpNick)}</span>${mpCourse ? `<span class="mp-course">${mpCourse}</span>` : ''}</div>`
+        ? `<div class="mypage-profile"><span class="mp-nick">${escHtml(mpNick)}</span>${mpCourse ? `<span class="mp-course">${mpCourse}</span>` : ''}<button class="mp-edit-btn" onclick="samuelEditProfile()">✏ 닉네임·과정 변경</button></div>`
         : '';
     box.innerHTML = `${profileHtml}<div class="stats-hero">${gauge}${streakCard}</div>${buildMpAnalytics()}${renderExamCalc()}${cards}`;
     recalcExam();
@@ -3567,10 +3575,18 @@ const scriptViewer = document.getElementById('stepScriptViewer');
     if (scriptViewer.style.display === 'block') {
         updateFloatingUI(false);
         if (typeof sdHideToolbar === 'function') sdHideToolbar();
+        document.body.classList.remove('sd-open');
+        // 암송 외우기에서 대본으로 들어왔다면 → 뒤로가기 시 그 일차 암송으로 복귀
+        if (window.__scriptFromStudyDay) {
+            const day = window.__scriptFromStudyDay;
+            window.__scriptFromStudyDay = null;
+            openDayStudy(day, false); // 복귀 플래그 없이 암송으로
+            return;
+        }
         scriptViewer.style.display = 'none';
         document.getElementById('globalHeader').classList.remove('header-hidden');
-        document.querySelector('.app-footer').classList.remove('footer-hidden'); 
-        
+        document.querySelector('.app-footer').classList.remove('footer-hidden');
+
         const scrollContent = document.getElementById('scrollContent');
         scrollContent.classList.remove('full-width');
         scrollContent.style.display = '';
@@ -3711,13 +3727,14 @@ function startStudy() {
     const allDays = Object.keys(bibleData);
     const curDayIdx = allDays.indexOf(d);
     
-    // 좌측 하단 일차 이동 바(유일한 일차 메뉴)
+    const dayNum = (String(d).match(/\d+/) || [d])[0];
+
+    // 일차 이동 바(유일한 일차 메뉴) + 대본 바로가기
     let navBtns = `<div class="study-floating-nav no-print">`;
     if (curDayIdx > 0) { navBtns += `<button class="float-btn" onclick="changeStudyDay('${allDays[curDayIdx-1]}')">◀ ${allDays[curDayIdx-1]}</button>`; }
     if (curDayIdx < allDays.length - 1) { navBtns += `<button class="float-btn" onclick="changeStudyDay('${allDays[curDayIdx+1]}')">${allDays[curDayIdx+1]} ▶</button>`; }
+    navBtns += `<button class="float-btn float-btn-script" onclick="openScriptFromStudy(${dayNum})" title="이 일차 대본 보기">📖 대본</button>`;
     navBtns += `</div>`;
-
-    const dayNum = (String(d).match(/\d+/) || [d])[0];
 
     // [변경] 4과정 PDF 암송 포맷 재현 (전역 헤더는 그대로 유지)
     let html = `
@@ -7069,16 +7086,23 @@ function showScriptList() {
     for (let day = 1; day <= 6; day++) {
         // 1일차 클릭 시 0번 인덱스(1-1.jpg), 2일차 클릭 시 2번 인덱스(2-1.jpg)로 이동하도록 매핑
         const startIndex = (day - 1) * 2;
-        const isHtml = !!scriptHtmlData[day];
-        const badge = isHtml ? ` <span style="background:#16a3a3;color:#fff;font-size:0.7em;padding:2px 8px;border-radius:10px;font-weight:700;vertical-align:middle;">선명 재현</span>` : '';
+        const badge = '';
         html += `<div class="plowing-list-item" onclick="openScriptViewer(${startIndex})"><svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>${day}일차 대본${badge}</div>`;
     }
     document.getElementById('scriptListContent').innerHTML = html;
     showStep('stepScriptList');
 }
+// [신규] 암송 외우기에서 해당 일차 대본으로 이동(뒤로가기 시 암송으로 복귀하도록 표시)
+function openScriptFromStudy(day){
+    window.__scriptFromStudyDay = day;
+    openScriptViewer((day - 1) * 2);
+}
 // [신규] 대본에서 해당 일차 암송 외우기로 바로 이동
-function openDayStudy(day){
+// setReturn=true 이면 암송에서 뒤로가기 시 다시 대본으로 복귀(대본→암송 진입). false 이면 일반 복귀(암송→대본→뒤로가기).
+function openDayStudy(day, setReturn = true){
     if (typeof sdHideToolbar === 'function') sdHideToolbar();
+    document.body.classList.remove('sd-open');
+    window.__scriptFromStudyDay = null;
     const dv = document.getElementById('stepScriptViewer'); if (dv) dv.style.display = 'none';
     const gh = document.getElementById('globalHeader'); if (gh) gh.classList.remove('header-hidden');
     const af = document.querySelector('.app-footer'); if (af) af.classList.remove('footer-hidden');
@@ -7090,7 +7114,7 @@ function openDayStudy(day){
         dsel.value = day + '일차';
     }
     if (bibleData[day + '일차']) {
-        window.__scriptReturnDay = day; // 암송에서 뒤로가기 시 대본으로 복귀하기 위한 표시
+        window.__scriptReturnDay = setReturn ? day : null; // 대본→암송 진입일 때만 뒤로가기로 대본 복귀
         startStudy();
     } else {
         window.__scriptReturnDay = null;
@@ -7128,29 +7152,40 @@ function fitScriptToScreen() {
     const availW = vp.clientWidth - padX * 2;
     const availH = vp.clientHeight - padTop - padBot;
     if (availW <= 0 || availH <= 0) return;
-    const wide = vp.clientWidth > 820;
-    page.classList.toggle('sd-2col', wide); // 넓은 화면은 2단
     row.style.transform = 'none';
     const measure = () => ({ w: page.offsetWidth, h: page.offsetHeight });
-    // 페이지 폭을 여러 값으로 시도 → 화면을 가장 많이 채우는(짧은 축 채움률 최대) 폭 선택.
-    // 배율만 최대화하면 좁은 폭이 뽑혀 좌우 여백이 생기므로 "채움률"로 고른다.
-    // 삽화가 과하게 커지지 않도록 한 단(칼럼) 폭에 상한을 둔다.
-    const COLMAX = 980;
-    const maxW = wide ? (COLMAX * 2 + 42) : Math.min(920, vp.clientWidth - 20);
-    const candidates = wide
-        ? [0.65, 0.8, 0.95, 1.1, 1.25, 1.4].map(f => Math.min(availW * f, maxW))
-        : [maxW];
-    let best = { fill: -1, scale: 0, w: candidates[0] };
-    for (const w of candidates) {
-        page.style.width = w + 'px';
+    const imgPage = page.classList.contains('sd-imgpage');
+    let best;
+    if (imgPage) {
+        // 이미지 대본: 원본 비율 그대로, 페이지 전체가 보이도록(contain) 맞춤 → 모든 일차가 동일 크기
+        page.classList.remove('sd-2col');
+        const im = page.querySelector('img');
+        const nW = (im && im.naturalWidth) ? im.naturalWidth : 2000;
+        page.style.width = nW + 'px';
         const m = measure();
-        if (!m.w || !m.h) continue;
-        const s = Math.min(availW / m.w, availH / m.h);
-        const fill = Math.min(m.w * s / availW, m.h * s / availH); // 짧은 축 채움률
-        if (fill > best.fill) best = { fill: fill, scale: s, w: w };
+        if (!m.w || !m.h) return;
+        best = { scale: Math.min(availW / m.w, availH / m.h), w: nW };
+    } else {
+        const wide = vp.clientWidth > 820;
+        page.classList.toggle('sd-2col', wide); // 넓은 화면은 2단
+        // 페이지 폭을 여러 값으로 시도 → 화면을 가장 많이 채우는(짧은 축 채움률 최대) 폭 선택.
+        const COLMAX = 980;
+        const maxW = wide ? (COLMAX * 2 + 42) : Math.min(920, vp.clientWidth - 20);
+        const candidates = wide
+            ? [0.65, 0.8, 0.95, 1.1, 1.25, 1.4].map(f => Math.min(availW * f, maxW))
+            : [maxW];
+        best = { fill: -1, scale: 0, w: candidates[0] };
+        for (const w of candidates) {
+            page.style.width = w + 'px';
+            const m = measure();
+            if (!m.w || !m.h) continue;
+            const s = Math.min(availW / m.w, availH / m.h);
+            const fill = Math.min(m.w * s / availW, m.h * s / availH); // 짧은 축 채움률
+            if (fill > best.fill) best = { fill: fill, scale: s, w: w };
+        }
     }
     page.style.width = best.w + 'px';
-    const baseScale = Math.max(0.3, Math.min(best.scale, 3.0));
+    const baseScale = imgPage ? Math.min(best.scale, 3.0) : Math.max(0.3, Math.min(best.scale, 3.0));
     const uz = (typeof sdUserZoom === 'number' && sdUserZoom >= 1) ? sdUserZoom : 1;
     const scale = baseScale * uz;             // 사용자 확대(자물쇠) 반영
     const m = measure();
@@ -7277,111 +7312,53 @@ function sdSetupZoomCtl() {
     }
     sdLoadZoom(); sdUpdateZoomBadge();
 }
+// [대본] 이미지 기반 뷰어 — 한 일차 = 한 페이지(day{N}.webp). 암송 외우기와 동일한
+// 필기/자물쇠/확대축소 엔진(sd-viewport)을 그대로 재사용하고, 모든 일차가 같은 크기(동일 비율)로 화면에 맞춰진다.
 function openScriptViewer(index) {
-    // PC 화면(가로 768 초과)일 때 인덱스가 홀수(오른쪽 페이지)라면 짝수(왼쪽 페이지)로 강제 정렬
-    const isPC = window.innerWidth > 768;
-    if (isPC && index % 2 !== 0) {
-        index = index - 1;
-    }
     currentScriptIndex = index;
-    
+
     document.getElementById('globalHeader').classList.add('header-hidden');
-    document.querySelector('.app-footer').classList.add('footer-hidden'); 
+    document.querySelector('.app-footer').classList.add('footer-hidden');
     document.querySelectorAll('.main-container .container').forEach(div => div.style.display = 'none');
+    document.body.classList.add('sd-open'); // 필기 툴바/팝업이 뷰어 위로 올라오도록(z-index)
 
-    const day = Math.floor(index / 2) + 1;
-    const part = (index % 2) + 1;
+    const day = Math.max(1, Math.min(6, Math.floor(index / 2) + 1));
 
-    // 선명 모드(html)일 때만 HTML 재현으로 렌더링 — 기본은 원본 PNG(아래)
-    if (scriptRenderMode === 'html' && scriptHtmlData[day]) {
-        const prevBtn = day > 1 ? `<button onclick="openScriptViewer(${(day-2)*2})">◀ ${day-1}일차</button>` : '';
-        const nextBtn = day < 6 ? `<button onclick="openScriptViewer(${day*2})">${day+1}일차 ▶</button>` : '';
-        const htmlDoc = `
-            <div class="sd-topbar no-print">
-                <div class="sd-topbar-title">${day}일차 대본</div>
-                <div class="sd-topbar-actions">
-                    <button onclick="openDayStudy(${day})" title="이 일차 암송 보기">📖 암송</button>
-                    ${prevBtn}${nextBtn}
-                    <button class="sd-close" onclick="goBack()">✖ 닫기</button>
-                </div>
-            </div>
-            <div class="sd-viewport" id="sdViewport"><div class="sd-fitrow" id="sdFitRow">${mergeScriptPages(scriptHtmlData[day])}</div></div>
-        `;
-        document.getElementById('scriptDetailContent').innerHTML = htmlDoc;
-        document.getElementById('stepScriptViewer').style.display = 'block';
-        const sdvp = document.getElementById('sdViewport');
-        sdvp.classList.add('sd-fit');
-        sdvp.scrollTop = 0;
-        // 한 화면 맞춤: 렌더 직후 + 이미지 로드 후 + 리사이즈 시 재계산
-        requestAnimationFrame(fitScriptToScreen);
-        setTimeout(fitScriptToScreen, 130);
-        setTimeout(fitScriptToScreen, 420);
-        sdvp.querySelectorAll('img').forEach(im => { if (!im.complete) im.addEventListener('load', fitScriptToScreen, { once: true }); });
-        sdSetupDrawing(day); // 필기 캔버스+툴바 준비(캔버스는 fit 시 크기 맞춤)
-        if (!window.__sdFitHandler) window.__sdFitHandler = () => fitScriptToScreen();
-        window.removeEventListener('resize', window.__sdFitHandler);
-        window.addEventListener('resize', window.__sdFitHandler);
-        initScriptSwipe(day); // 좌우 스와이프로 이전/다음 일차
-        updateFloatingUI(false);
-        return;
-    }
-
-    // 화면 크기에 따라 로드할 이미지 결정 — 가벼운 WebP 우선, 실패 시 원본 PNG로 폴백(빠른 로딩)
-    const imgTag = (d, p, alt) => `<img src="${d}-${p}.webp" onerror="this.onerror=null;this.src='${d}-${p}.png'" onload="scriptImgLoaded()" alt="${alt}" draggable="false" />`;
-    let imgHtml = "";
-    if (isPC) {
-        imgHtml = imgTag(day, 1, `${day}일차 1페이지`) + imgTag(day, 2, `${day}일차 2페이지`);
-    } else {
-        imgHtml = imgTag(day, part, `${day}일차 대본 ${part}`);
-    }
-
-    let prevDayHtml = day > 1 ? `<button class="script-day-btn" onclick="openScriptViewer(${(day-2)*2})">◀ ${day-1}일차</button>` : `<div style="width:80px"></div>`;
-    let nextDayHtml = day < 6 ? `<button class="script-day-btn" onclick="openScriptViewer(${day*2})">${day+1}일차 ▶</button>` : `<div style="width:80px"></div>`;
-
-    // 제목 표시: PC는 "N일차 대본", 모바일은 "N일차 대본 (1/2)"
-    const titleText = isPC ? `${day}일차 대본` : `${day}일차 대본 <span style="font-size:0.8em; color:#ddd;">(${part}/2)</span>`;
-
-    const hasHtml = !!scriptHtmlData[day];
-    const sharpBtn = hasHtml ? `<button class="script-mode-btn" onclick="toggleScriptRenderMode()" title="선명한 텍스트 재현으로 보기">✨ 선명</button>` : '';
-    let html = `
-        <div class="script-fullscreen-header">
-            <div class="script-fullscreen-title">${titleText}</div>
-            <div class="script-header-actions">
-                ${sharpBtn}
-                <button class="script-mode-btn" onclick="openDayStudy(${day})" title="이 일차 암송 보기">📖 암송</button>
-                <button class="script-mode-btn" onclick="printScript(${day})" title="이 일차 대본 인쇄">🖨 인쇄</button>
-                <button class="script-close-btn" onclick="goBack()">✖ 닫기</button>
+    const prevBtn = day > 1 ? `<button onclick="openScriptViewer(${(day-2)*2})">◀ ${day-1}일차</button>` : '';
+    const nextBtn = day < 6 ? `<button onclick="openScriptViewer(${day*2})">${day+1}일차 ▶</button>` : '';
+    const htmlDoc = `
+        <div class="sd-topbar no-print">
+            <div class="sd-topbar-title">${day}일차 대본</div>
+            <div class="sd-topbar-actions">
+                <button onclick="openDayStudy(${day})" title="이 일차 암송 보기">📖 암송</button>
+                ${prevBtn}${nextBtn}
+                <button class="sd-close" onclick="goBack()">✖ 닫기</button>
             </div>
         </div>
-
-        <div id="scriptImageWrapper" class="script-viewer-container">
-            <div id="scriptLoading" class="script-loading"><div class="script-spinner"></div>대본 불러오는 중…</div>
-            <div id="scriptTransformLayer" class="script-image-wrapper">
-                ${imgHtml}
-            </div>
-        </div>
-
-        <div class="script-day-nav no-print">
-            ${prevDayHtml}
-            ${nextDayHtml}
-        </div>
+        <div class="sd-viewport" id="sdViewport"><div class="sd-fitrow" id="sdFitRow"><div class="sd-page sd-imgpage"><img id="sdDaeImg" src="day${day}.webp" alt="${day}일차 대본" draggable="false" /></div></div></div>
     `;
-
-    document.getElementById('scriptDetailContent').innerHTML = html;
+    document.getElementById('scriptDetailContent').innerHTML = htmlDoc;
     document.getElementById('stepScriptViewer').style.display = 'block';
-
-    updateFloatingUI(false);
-    initScriptSwipeAndZoom(isPC);
-    // 인접 일차 미리 받아두기(다음/이전 일차 열 때 즉시 표시)
-    preloadScriptDay(day - 1);
-    preloadScriptDay(day + 1);
+    const sdvp = document.getElementById('sdViewport');
+    sdvp.classList.add('sd-fit');
+    sdvp.scrollTop = 0;
+    // 한 화면 맞춤: 렌더 직후 + 이미지 로드 후 + 리사이즈 시 재계산
+    requestAnimationFrame(fitScriptToScreen);
+    setTimeout(fitScriptToScreen, 130);
+    setTimeout(fitScriptToScreen, 420);
+    const im0 = document.getElementById('sdDaeImg');
+    if (im0 && !im0.complete) im0.addEventListener('load', fitScriptToScreen, { once: true });
+    sdSetupDrawing(day); // 필기 캔버스+툴바(암송 외우기 엔진 그대로)
+    if (!window.__sdFitHandler) window.__sdFitHandler = () => fitScriptToScreen();
+    window.removeEventListener('resize', window.__sdFitHandler);
+    window.addEventListener('resize', window.__sdFitHandler);
+    initScriptSwipe(day); // 좌우 스와이프로 이전/다음 일차
+    // 필기 툴바는 암송 외우기와 동일하게 계속 표시(sdSetupDrawing에서 updateFloatingUI(true,'plowing') 호출됨)
+    preloadScriptDays(); // 모든 일차 미리 받아둠 → 전환 시 지연 없음
 }
-// 이미지가 한 장이라도 로드되면 로딩 표시 숨김
-function scriptImgLoaded(){ const s = document.getElementById('scriptLoading'); if (s) s.style.display = 'none'; }
-// 인접 일차 WebP를 백그라운드로 미리 받아둠
-function preloadScriptDay(d){
-    if (d < 1 || d > 6) return;
-    for (let p = 1; p <= 2; p++){ const im = new Image(); im.src = `${d}-${p}.webp`; }
+// 모든 일차 대본 이미지를 미리 받아둠(전환 지연 방지)
+function preloadScriptDays(){
+    for (let d = 1; d <= 6; d++){ const im = new Image(); im.src = `day${d}.webp`; }
 }
 
 // 핀치 줌, 마우스 휠 줌 & 터치/마우스 스와이프 통합 제어 로직
@@ -7526,6 +7503,22 @@ function initScriptSwipeAndZoom(isPC) {
   .auth-btn.logged-in { background: var(--primary); color: #fff !important; }
   [data-theme="dark"] .auth-btn { border-color: #5aa9e6 !important; color: #8cc6f0 !important; }
   [data-theme="dark"] .auth-btn.logged-in { background: #2b6aa0; color: #fff !important; }
+
+  /* [신규] 프로필 드롭다운 (인물 아이콘 클릭 → 닉네임 / 마이페이지 / 로그아웃) */
+  .profile-menu { position: fixed; display: none; z-index: 100000; min-width: 180px; background: #fff; border-radius: 14px;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.22); border: 1px solid #eef0f3; overflow: hidden; padding: 6px; }
+  .profile-menu .pm-head { padding: 12px 14px 10px; text-align: center; border-bottom: 1px solid #f0f2f5; margin-bottom: 6px; }
+  .profile-menu .pm-nick { font-weight: 800; font-size: 1.02rem; color: #222; word-break: break-all; }
+  .profile-menu .pm-sub { font-size: 0.8rem; color: #8a94a2; margin-top: 2px; }
+  .profile-menu .pm-item { display: block; width: 100%; text-align: left; background: transparent; border: none; cursor: pointer;
+    font-size: 0.95rem; font-weight: 600; color: #2c3440; padding: 11px 14px; border-radius: 10px; }
+  .profile-menu .pm-item:hover { background: #f2f5f9; }
+  .profile-menu .pm-item.pm-logout { color: #e74c3c; }
+  [data-theme="dark"] .profile-menu { background: #1b212b; border-color: #2c333f; }
+  [data-theme="dark"] .profile-menu .pm-head { border-bottom-color: #2c333f; }
+  [data-theme="dark"] .profile-menu .pm-nick { color: #eef2f7; }
+  [data-theme="dark"] .profile-menu .pm-item { color: #dfe6ee; }
+  [data-theme="dark"] .profile-menu .pm-item:hover { background: #262e3a; }
 
   /* 닉네임 / 계정 모달 */
   .nk-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 99999; padding: 20px; }
@@ -8091,17 +8084,7 @@ function ensureModals(){
   document.body.appendChild(ov);
 
   document.getElementById('nkChangeBtn').onclick = () => showEditView(false);
-  document.getElementById('nkLogoutBtn').onclick = async () => {
-    closeModal();
-    // [신규] 로그아웃 전 — 현재 계정 데이터를 클라우드에 최신으로 저장(재로그인 시 그대로 복원)
-    try { await uploadSnapshot(); } catch(e){}
-    // 신원이 바뀌기 전(아직 이 계정으로 인증된 상태)에 내 접속 항목을 직접 제거 → 로그아웃 후 유령으로 남아 +1 되는 것 방지
-    try { const pu = presenceUid; if (pu) { onDisconnect(ref(db, 'status/' + pu)).cancel(); presenceUid = null; await remove(ref(db, 'status/' + pu)); } } catch(e){}
-    try { await signOut(auth); } catch(e){ alert('로그아웃 실패: ' + (e.message||e)); }
-    // [신규] 이전 계정의 로컬 데이터(필기·진도 등) 비우고 새로고침 → 깨끗한 상태로 시작(공용 기기 보호)
-    try { clearSyncedLocal(); } catch(e){}
-    location.reload();
-  };
+  document.getElementById('nkLogoutBtn').onclick = () => { closeModal(); samuelLogout(); };
   document.getElementById('nkCloseBtn').onclick = closeModal;
   document.getElementById('nkCancelBtn').onclick = closeModal;
   document.getElementById('nkSaveBtn').onclick = saveNickname;
@@ -8137,6 +8120,11 @@ function openNicknameModal(required){
   document.getElementById('nkOverlay').classList.add('show');
   showEditView(!!required);
 }
+// [신규] 마이페이지의 '닉네임·과정 변경' 버튼 → 중복확인 되는 기존 편집기(닉네임+과정)를 연다
+window.samuelEditProfile = function(){
+  if (!currentUser || currentUser.isAnonymous){ alert('로그인 후 변경할 수 있어요.'); return; }
+  openNicknameModal(false);
+};
 function openAccountModal(){
   ensureModals();
   nkRequired = false;
@@ -8144,6 +8132,49 @@ function openAccountModal(){
   document.getElementById('nkAccountView').style.display = 'block';
   document.getElementById('nkEditView').style.display = 'none';
   document.getElementById('nkOverlay').classList.add('show');
+}
+// [신규] 로그아웃 — 클라우드 저장 후 로컬 정리 & 새로고침(계정 모달·프로필 드롭다운에서 공용)
+async function samuelLogout(){
+  try { await uploadSnapshot(); } catch(e){}
+  try { const pu = presenceUid; if (pu) { onDisconnect(ref(db, 'status/' + pu)).cancel(); presenceUid = null; await remove(ref(db, 'status/' + pu)); } } catch(e){}
+  try { await signOut(auth); } catch(e){ alert('로그아웃 실패: ' + (e.message||e)); }
+  try { clearSyncedLocal(); } catch(e){}
+  location.reload();
+}
+// [신규] 프로필 드롭다운 — 인물 아이콘(authBtn) 클릭 시: 최상단 닉네임 · 마이페이지 · 로그아웃
+function ensureProfileMenu(){
+  if (document.getElementById('profileMenu')) return;
+  const m = document.createElement('div');
+  m.id = 'profileMenu'; m.className = 'profile-menu';
+  m.innerHTML =
+    '<div class="pm-head"><div class="pm-nick" id="pmNick"></div><div class="pm-sub" id="pmSub"></div></div>' +
+    '<button class="pm-item" id="pmMyPage">마이페이지</button>' +
+    '<button class="pm-item pm-logout" id="pmLogout">로그아웃</button>';
+  document.body.appendChild(m);
+  document.getElementById('pmMyPage').onclick = () => { closeProfileMenu(); if (typeof window.selectRootMode === 'function') window.selectRootMode('stats'); };
+  document.getElementById('pmLogout').onclick = () => { closeProfileMenu(); samuelLogout(); };
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('profileMenu');
+    if (!menu || menu.style.display !== 'block') return;
+    const btn = document.getElementById('authBtn');
+    if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+    closeProfileMenu();
+  });
+}
+function closeProfileMenu(){ const m = document.getElementById('profileMenu'); if (m) m.style.display = 'none'; }
+function toggleProfileMenu(){
+  ensureProfileMenu();
+  const m = document.getElementById('profileMenu');
+  const btn = document.getElementById('authBtn');
+  if (!m || !btn) return;
+  if (m.style.display === 'block'){ closeProfileMenu(); return; }
+  document.getElementById('pmNick').textContent = myNickname || '내 계정';
+  document.getElementById('pmSub').textContent = [1,2,3,4].includes(parseInt(myCourse,10)) ? (myCourse + '과정') : '';
+  const r = btn.getBoundingClientRect();
+  m.style.display = 'block';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.style.right = Math.max(8, (window.innerWidth - r.right)) + 'px';
+  m.style.left = 'auto';
 }
 async function saveNickname(){
   const msg = document.getElementById('nkMsg');
@@ -8819,7 +8850,7 @@ getRedirectResult(auth).catch((e) => {
 
 window.samuelToggleAuth = async function(){
   if (currentUser && !currentUser.isAnonymous){
-    openAccountModal();
+    toggleProfileMenu();   // 인물 아이콘 → 드롭다운(닉네임 / 마이페이지 / 로그아웃)
     return;
   }
   // 인앱 브라우저면 안내 후 중단
