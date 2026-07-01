@@ -1298,22 +1298,29 @@
     .sd-legend-item p { margin: 0; font-size: 0.9em; color: #5b6675; line-height: 1.5; }
 
     /* 대본 뷰어 상단 바 (HTML 모드) */
+    /* [개선] 상단 '창 제목표시줄' 느낌 제거 → 투명 바 + 떠 있는 알약 버튼(암송 외우기 플로팅 컨트롤과 동일 톤).
+       바 자체는 pointer-events:none으로 본문 제스처(팬/필기)를 막지 않고, 버튼만 클릭 가능. */
     .sd-topbar {
         position: absolute; top: 0; left: 0; right: 0;
-        height: 52px; display: flex; align-items: center; justify-content: space-between;
-        padding: 0 14px; z-index: 3020;
-        background: rgba(255,255,255,0.85);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid rgba(0,0,0,0.06);
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 12px; z-index: 3020;
+        background: transparent; border: none; pointer-events: none;
     }
-    .sd-topbar-title { font-weight: 800; color: #1f2a37; font-size: 1rem; }
-    .sd-topbar-actions { display: flex; gap: 8px; }
+    .sd-topbar-title {
+        font-weight: 800; color: #1f2a37; font-size: 0.9rem;
+        background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 999px;
+        box-shadow: 0 3px 12px rgba(15,30,60,0.12); pointer-events: auto;
+    }
+    [data-theme="dark"] .sd-topbar-title { background: rgba(30,36,46,0.92); color: #e6ebf2; }
+    .sd-topbar-actions { display: flex; gap: 8px; pointer-events: auto; }
     .sd-topbar button {
-        border: none; background: #eef1f5; color: #2b3440;
-        font-weight: 700; font-size: 0.85rem; padding: 7px 14px;
-        border-radius: 20px; cursor: pointer; transition: 0.15s;
+        border: none; background: rgba(255,255,255,0.92); color: #2b3440;
+        font-weight: 700; font-size: 0.85rem; padding: 8px 14px;
+        border-radius: 999px; cursor: pointer; transition: 0.15s;
+        box-shadow: 0 3px 12px rgba(15,30,60,0.14); pointer-events: auto;
     }
-    .sd-topbar button:hover { background: #e0e5ec; }
+    .sd-topbar button:hover { background: #fff; }
+    [data-theme="dark"] .sd-topbar button { background: rgba(30,36,46,0.92); color: #e6ebf2; }
     .sd-topbar button.sd-close { background: var(--error); color: #fff; }
 
     @media (max-width: 600px) {
@@ -1323,13 +1330,18 @@
         .sd-branch-body { padding-left: 12px; }
     }
 
-    /* [신규] 대본 뷰어를 화면 전체로 — .scroll-content(가운데정렬 flex) 안에서 가운데 카드처럼 보이던 것을 전체화면으로 */
-    #stepScriptViewer.paper-view-container {
-        position: fixed; inset: 0; z-index: 3000;
-        padding: 0 !important; margin: 0;
-        background: #eef1f5;
+    /* [개선] 대본을 암송 외우기처럼 '한 화면 인페이지 몰입'으로 — 별도 오버레이 창(fixed) 느낌 제거.
+       body.sd-open이 전역 헤더/푸터를 밀어 숨기고(암송과 동일 동작) 뷰어가 스크롤영역을 꽉 채움.
+       study-immersive를 쓰지 않고 sd-open으로 처리 → 암송 제스처 모듈(studyGestureDown, study-immersive 게이트)과 충돌 방지. */
+    body.sd-open #globalHeader { position: fixed; top: 0; left: 0; right: 0; transform: translateY(-100%); transition: transform .28s ease; z-index: 3000; will-change: transform; }
+    body.sd-open .app-footer { position: fixed; bottom: 0; left: 0; right: 0; transform: translateY(100%); transition: transform .28s ease; z-index: 3000; }
+    body.sd-open.sd-reveal-top #globalHeader { transform: translateY(0); }
+    body.sd-open #scrollContent { overflow: hidden; justify-content: safe center; padding: 0; touch-action: none; }
+    body.sd-open #stepScriptViewer.paper-view-container {
+        flex: 1 1 auto; align-self: stretch; width: 100%; height: 100%;
+        min-height: 0; padding: 0 !important; margin: 0; background: #eef1f5;
     }
-    [data-theme="dark"] #stepScriptViewer.paper-view-container { background: #14181f; }
+    [data-theme="dark"] body.sd-open #stepScriptViewer.paper-view-container { background: #14181f; }
 
     /* [신규] 대본 한 화면 맞춤 모드 — 각 일차를 스크롤 없이 한 화면에 가득 (암송 외우기처럼) */
     .sd-viewport.sd-fit {
@@ -7219,13 +7231,16 @@ function initScriptSwipe(day) {
     const pts = new Map(); let pinch0 = null, zoom0 = 1;
     const goNext = () => { if (day < 6) openScriptViewer(day * 2); };
     const goPrev = () => { if (day > 1) openScriptViewer((day - 2) * 2); };
-    const isDrawing = () => { const c = document.getElementById('sdDrawCanvas'); return c && c.classList.contains('draw-active'); };
+    const penToolActive = () => { const c = document.getElementById('sdDrawCanvas'); return c && c.classList.contains('draw-active'); };
     vp.addEventListener('pointerdown', e => {
         pts.set(e.pointerId, [e.clientX, e.clientY]);
         if (pts.size === 2) { // 핀치 시작
             const a = [...pts.values()]; pinch0 = Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]); zoom0 = sdUserZoom; tracking = false; return;
         }
-        if (isDrawing()) return; // 펜 도구로 그리는 중이면 제스처 무시
+        // 펜/마우스(그리기 포인터)로 필기 도구가 켜져 있으면 그 포인터는 그리기용 → 제스처 무시.
+        // 손가락은 펜이 선택돼 있어도 팬/스와이프 허용(암송 외우기처럼).
+        if (penToolActive() && isDrawablePointer(e)) return;
+        if (isDrawing) return; // 펜으로 획을 그리는 중이면 손가락 제스처 무시(팜 리젝션)
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         sx = e.clientX; sy = e.clientY; tracking = true; panned = false;
     });
@@ -7320,7 +7335,12 @@ function openScriptViewer(index) {
     document.getElementById('globalHeader').classList.add('header-hidden');
     document.querySelector('.app-footer').classList.add('footer-hidden');
     document.querySelectorAll('.main-container .container').forEach(div => div.style.display = 'none');
-    document.body.classList.add('sd-open'); // 필기 툴바/팝업이 뷰어 위로 올라오도록(z-index)
+    // 암송(study-immersive) 제스처 모듈과 충돌하지 않도록 study 몰입 클래스는 해제하고 대본 전용 sd-open 사용
+    document.body.classList.remove('study-immersive', 'reveal-top', 'reveal-bottom', 'study-zoomscroll');
+    // 인페이지 몰입 시 대본 뷰어만 보이도록 형제 뷰(암송/밭갈이) 숨김
+    const _sa = document.getElementById('studyArea'); if (_sa) _sa.style.display = 'none';
+    const _pd = document.getElementById('stepPlowingDetail'); if (_pd) _pd.style.display = 'none';
+    document.body.classList.add('sd-open'); // 인페이지 몰입 + 필기 툴바/팝업 z-index
 
     const day = Math.max(1, Math.min(6, Math.floor(index / 2) + 1));
 
