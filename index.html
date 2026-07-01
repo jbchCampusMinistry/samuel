@@ -1363,38 +1363,35 @@
     .sd-viewport.sd-fit .sd-fitrow .sd-page.sd-2col .sd-sec-head { break-after: avoid; }
     .sd-viewport.sd-fit .sd-fig { max-width: 100%; }
 
-    /* [신규] 대본 필기 캔버스 (fitrow 안에 있어 본문과 함께 스케일됨) */
-    #sdCanvas {
-        position: absolute; top: 0; left: 0;
-        z-index: 5; touch-action: none;
-        pointer-events: none; /* 필기 모드일 때만 auto */
+    /* [신규] 대본 필기 캔버스 — 암송 외우기 엔진(#drawingCanvas)과 동일 동작. fitrow 안이라 본문과 함께 스케일됨 */
+    #sdDrawCanvas {
+        position: absolute; top: 0; left: 0; z-index: 50;
+        pointer-events: none; touch-action: none; display: block;
     }
-    #sdViewport.sd-pen #sdCanvas { pointer-events: auto; }
-    #sdViewport.sd-pen { cursor: crosshair; }
-    /* 대본 필기 툴바 */
-    .sd-penbar {
-        position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
-        z-index: 3600; display: flex; align-items: center; gap: 6px;
-        background: rgba(255,255,255,0.96); border: 1px solid rgba(0,0,0,0.08);
-        box-shadow: 0 6px 24px rgba(15,30,60,0.18); border-radius: 999px;
-        padding: 6px 8px; backdrop-filter: blur(6px);
+    #sdDrawCanvas.draw-active { pointer-events: auto; cursor: crosshair; touch-action: none; }
+
+    /* 대본 상단 요일 배지 숨김(요청) */
+    .sd-viewport .sd-day-badge { display: none !important; }
+
+    /* [신규] 대본 확대/축소 + 자물쇠 컨트롤 (암송 외우기와 동일 UX) */
+    #sdZoomCtl {
+        position: fixed; top: 8px; right: 118px; z-index: 3600;
+        display: none; align-items: center; gap: 2px;
+        background: rgba(255,255,255,0.95); border: 1px solid rgba(0,0,0,0.08);
+        box-shadow: 0 4px 16px rgba(15,30,60,0.15); border-radius: 999px; padding: 3px 5px;
+        backdrop-filter: blur(6px);
     }
-    [data-theme="dark"] .sd-penbar { background: rgba(30,36,46,0.96); border-color: rgba(255,255,255,0.12); }
-    .sd-penbar button {
-        border: none; background: #eef1f5; color: #2b3440; cursor: pointer;
-        border-radius: 999px; font-weight: 800; font-size: 0.86rem;
-        padding: 8px 12px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    [data-theme="dark"] #sdZoomCtl { background: rgba(30,36,46,0.95); border-color: rgba(255,255,255,0.12); }
+    #sdZoomCtl .szc-btn {
+        border: none; background: transparent; color: #2b3440; cursor: pointer;
+        width: 30px; height: 30px; border-radius: 50%; font-size: 1.1rem; font-weight: 800;
+        display: inline-flex; align-items: center; justify-content: center;
     }
-    [data-theme="dark"] .sd-penbar button { background: #2a3340; color: #e6ebf2; }
-    .sd-penbar button.on { background: #16a3a3; color: #fff; }
-    .sd-penbar .sd-pen-tools { display: none; align-items: center; gap: 6px; }
-    .sd-penbar.active .sd-pen-tools { display: inline-flex; }
-    .sd-pen-color {
-        width: 26px; height: 26px; border-radius: 50%; padding: 0;
-        border: 2px solid rgba(0,0,0,0.15) !important;
-    }
-    .sd-pen-color.sel { outline: 3px solid #16a3a3; outline-offset: 1px; }
-    .sd-penbar .sd-pen-div { width: 1px; height: 24px; background: rgba(0,0,0,0.12); margin: 0 2px; }
+    [data-theme="dark"] #sdZoomCtl .szc-btn { color: #e6ebf2; }
+    #sdZoomCtl .szc-pct { min-width: 44px; text-align: center; font-weight: 800; font-size: 0.82rem; color: #2b3440; }
+    [data-theme="dark"] #sdZoomCtl .szc-pct { color: #e6ebf2; }
+    #sdZoomCtl.zlocked .szc-btn.zoombtn { opacity: 0.35; pointer-events: none; }
+    #sdZoomCtl .szc-lock.locked { color: #16a3a3; }
 
     /* =========================================================
        [신규] 다크 모드 — 라이트 모드를 건드리지 않도록 덧씌움
@@ -5554,6 +5551,8 @@ function toggleFingerDraw(v) {
 }
 
 function currentDrawKey() {
+    const sv = document.getElementById('stepScriptViewer');
+    if (sv && sv.style.display === 'block') return `draw_script_${window.__sdDay || 1}`;
     const sa = document.getElementById('studyArea');
     if (sa && sa.style.display === 'block') {
         const d = (document.getElementById('daySelect') || {}).value || '';
@@ -5651,7 +5650,11 @@ function redrawStrokes() {
 
 function getDrawPos(e) {
     const rect = drawCanvas.getBoundingClientRect();
-    return [e.clientX - rect.left, e.clientY - rect.top];
+    // 캔버스가 CSS로 확대/축소(대본 뷰어의 transform scale)되어 있으면 실제 캔버스 좌표로 환산.
+    // 암송 외우기는 1:1이라 비율=1(영향 없음).
+    const sx = rect.width ? (drawCanvas.clientWidth / rect.width) : 1;
+    const sy = rect.height ? (drawCanvas.clientHeight / rect.height) : 1;
+    return [(e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy];
 }
 
 function distToSegment(px, py, ax, ay, bx, by) {
@@ -6845,7 +6848,6 @@ const scriptHtmlData = {
           <div class="sd-item">징조는 볼 수 있을지라도 주님이 재림하시는 날은 하나님의 권한이기에 알 수 없음<span class="sd-ref">마 24:36</span></div>
           <div class="sd-item">그리스도인들은 자신의 위치에서 최선의 삶을 사는 가운데 주님을 맞아야 함<span class="sd-ref">눅 17:34-35</span></div>
         </div>
-        <div class="sd-quote">이러므로 너희도 예비하고 있으라 생각지 않은 때에 인자가 오리라<span class="sd-ref">마 24:44</span></div>
         <div class="sd-key">거듭난 사람은 주님이 데려가시고, 거듭나지 못한 사람은 버려둠을 당하게 될 것</div>
       </div>
 
@@ -6875,6 +6877,7 @@ const scriptHtmlData = {
       </div>
 
       <div class="sd-final">이 모든 환난을 피할 수 있는 방법은 구원받는 것. 주님을 맞기 위해 예비해야 함.</div>
+      <div class="sd-quote" style="max-width:640px;margin:14px auto 0;">이러므로 너희도 예비하고 있으라 생각지 않은 때에 인자가 오리라<span class="sd-ref">마 24:44</span></div>
     </div>
     `,
 
@@ -7147,13 +7150,21 @@ function fitScriptToScreen() {
         if (fill > best.fill) best = { fill: fill, scale: s, w: w };
     }
     page.style.width = best.w + 'px';
-    const scale = Math.max(0.3, Math.min(best.scale, 3.0));
+    const baseScale = Math.max(0.3, Math.min(best.scale, 3.0));
+    const uz = (typeof sdUserZoom === 'number' && sdUserZoom >= 1) ? sdUserZoom : 1;
+    const scale = baseScale * uz;             // 사용자 확대(자물쇠) 반영
     const m = measure();
-    // top-left 기준 좌표로 화면 가운데 배치
-    const tx = padX + Math.max(0, (availW - m.w * scale) / 2);
-    const ty = padTop + Math.max(0, (availH - m.h * scale) / 2);
+    const scaledW = m.w * scale, scaledH = m.h * scale;
+    // 화면보다 크면(확대) 팬 허용 범위로 제한, 작으면 가운데
+    let tx, ty;
+    if (scaledW > availW) { const over = scaledW - availW; sdPanX = Math.max(-over, Math.min(0, sdPanX)); tx = padX + sdPanX; }
+    else { sdPanX = 0; tx = padX + (availW - scaledW) / 2; }
+    if (scaledH > availH) { const over = scaledH - availH; sdPanY = Math.max(-over, Math.min(0, sdPanY)); ty = padTop + sdPanY; }
+    else { sdPanY = 0; ty = padTop + (availH - scaledH) / 2; }
     row.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
-    if (typeof sdResizeCanvas === 'function') sdResizeCanvas(); // 필기 캔버스도 페이지 크기에 맞춤
+    if (typeof sdUpdateZoomBadge === 'function') sdUpdateZoomBadge();
+    // 필기 캔버스(암송 엔진)도 페이지 크기에 맞춤
+    if (typeof drawCanvas !== 'undefined' && drawCanvas && drawCanvas.id === 'sdDrawCanvas' && typeof resizeDrawCanvas === 'function') resizeDrawCanvas();
 }
 // [신규] 한 일차가 여러 .sd-page(원본 좌/우)로 나뉘어 있으면 하나로 합침 → 2단 균형 배치로 화면을 꽉 채우기 위함
 function mergeScriptPages(dayHtml) {
@@ -7165,161 +7176,106 @@ function mergeScriptPages(dayHtml) {
     srcPages.forEach(p => { inner += p.innerHTML; });
     return '<div class="sd-page">' + inner + '</div>';
 }
-// [신규] 대본에서 좌우로 슬라이드(스와이프)하면 이전/다음 일차로 이동
+// [신규] 대본 제스처: (확대 X) 좌우 스와이프=이전/다음 일차 · (확대 O) 드래그=이동(팬) · 두 손가락=핀치 확대
 function initScriptSwipe(day) {
     const vp = document.getElementById('sdViewport');
     if (!vp) return;
-    let sx = 0, sy = 0, tracking = false;
+    let sx = 0, sy = 0, tracking = false, panned = false;
+    const pts = new Map(); let pinch0 = null, zoom0 = 1;
     const goNext = () => { if (day < 6) openScriptViewer(day * 2); };
     const goPrev = () => { if (day > 1) openScriptViewer((day - 2) * 2); };
+    const isDrawing = () => { const c = document.getElementById('sdDrawCanvas'); return c && c.classList.contains('draw-active'); };
     vp.addEventListener('pointerdown', e => {
-        if (vp.classList.contains('sd-pen')) return; // 필기 중엔 스와이프 안 함
+        pts.set(e.pointerId, [e.clientX, e.clientY]);
+        if (pts.size === 2) { // 핀치 시작
+            const a = [...pts.values()]; pinch0 = Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]); zoom0 = sdUserZoom; tracking = false; return;
+        }
+        if (isDrawing()) return; // 펜 도구로 그리는 중이면 제스처 무시
         if (e.pointerType === 'mouse' && e.button !== 0) return;
-        sx = e.clientX; sy = e.clientY; tracking = true;
+        sx = e.clientX; sy = e.clientY; tracking = true; panned = false;
     });
-    vp.addEventListener('pointerup', e => {
+    vp.addEventListener('pointermove', e => {
+        if (pts.has(e.pointerId)) pts.set(e.pointerId, [e.clientX, e.clientY]);
+        if (pts.size === 2 && pinch0) { // 핀치 확대/축소
+            if (sdZoomLocked) return;
+            const a = [...pts.values()]; const d = Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]);
+            sdUserZoom = Math.min(3, Math.max(1, +(zoom0 * (d / pinch0)).toFixed(3)));
+            if (sdUserZoom === 1) { sdPanX = 0; sdPanY = 0; }
+            fitScriptToScreen(); return;
+        }
         if (!tracking) return;
-        tracking = false;
-        const dx = e.clientX - sx, dy = e.clientY - sy;
-        if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.4) {
-            if (dx < 0) goNext(); else goPrev();
+        if (sdUserZoom > 1) { // 확대 상태 → 드래그로 팬
+            const dx = e.clientX - sx, dy = e.clientY - sy; sx = e.clientX; sy = e.clientY;
+            sdPanX += dx; sdPanY += dy; panned = true; fitScriptToScreen();
         }
     });
-    vp.addEventListener('pointercancel', () => { tracking = false; });
+    const end = e => {
+        pts.delete(e.pointerId);
+        if (pts.size < 2) { pinch0 = null; sdSaveZoom(); }
+        if (!tracking) return; tracking = false;
+        if (sdUserZoom > 1 || panned) return; // 확대 중엔 일차 이동 안 함
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.4) { if (dx < 0) goNext(); else goPrev(); }
+    };
+    vp.addEventListener('pointerup', end);
+    vp.addEventListener('pointercancel', end);
 }
 
-// ===== [신규] 대본 필기 (암송 외우기처럼 펜/형광펜/지우개, 일차별 저장) =====
-const sdDraw = { strokes: [], tool: 'pen', color: '#e74c3c', penMode: false, cur: null, drawing: false, day: 1 };
-function sdKey() { return 'sd_draw_' + sdDraw.day; }
-function sdLoadStrokes(day) {
-    sdDraw.day = day;
-    try { sdDraw.strokes = JSON.parse(localStorage.getItem(sdKey()) || '[]'); } catch (e) { sdDraw.strokes = []; }
-}
-function sdSaveStrokes() { try { localStorage.setItem(sdKey(), JSON.stringify(sdDraw.strokes)); } catch (e) {} }
-function sdResizeCanvas() {
-    const row = document.querySelector('.sd-fitrow');
-    const page = row && row.querySelector('.sd-page');
-    const cv = document.getElementById('sdCanvas');
-    if (!row || !page || !cv) return;
-    const w = page.offsetWidth, h = page.offsetHeight;
-    if (!w || !h) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    cv.style.width = w + 'px'; cv.style.height = h + 'px';
-    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-    cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
-    sdRedraw();
-}
-function sdDrawStroke(ctx, s) {
-    if (!s.p || !s.p.length) return;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.strokeStyle = s.c; ctx.lineWidth = s.w; ctx.globalAlpha = s.hl ? 0.35 : 1;
-    ctx.beginPath(); ctx.moveTo(s.p[0][0], s.p[0][1]);
-    for (let i = 1; i < s.p.length; i++) ctx.lineTo(s.p[i][0], s.p[i][1]);
-    if (s.p.length === 1) ctx.lineTo(s.p[0][0] + 0.1, s.p[0][1] + 0.1);
-    ctx.stroke(); ctx.globalAlpha = 1;
-}
-function sdRedraw() {
-    const cv = document.getElementById('sdCanvas'); if (!cv) return;
-    const ctx = cv.getContext('2d'); const dpr = Math.min(2, window.devicePixelRatio || 1);
-    ctx.clearRect(0, 0, cv.width / dpr, cv.height / dpr);
-    for (const s of sdDraw.strokes) sdDrawStroke(ctx, s);
-    if (sdDraw.cur) sdDrawStroke(ctx, sdDraw.cur);
-}
-function sdPoint(e) {
-    const cv = document.getElementById('sdCanvas'); const r = cv.getBoundingClientRect();
-    return [(e.clientX - r.left) * (cv.clientWidth / r.width), (e.clientY - r.top) * (cv.clientHeight / r.height)];
-}
-function sdEraseAt(p) {
-    const R = 16; let changed = false;
-    for (let i = sdDraw.strokes.length - 1; i >= 0; i--) {
-        const s = sdDraw.strokes[i];
-        if (s.p.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < R + s.w)) { sdDraw.strokes.splice(i, 1); changed = true; }
-    }
-    if (changed) sdRedraw();
-}
-function sdOnDown(e) {
-    if (!sdDraw.penMode) return;
-    sdDraw.drawing = true;
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (x) {}
-    const p = sdPoint(e);
-    if (sdDraw.tool === 'eraser') { sdEraseAt(p); sdDraw.cur = null; }
-    else sdDraw.cur = { c: sdDraw.color, w: sdDraw.tool === 'hl' ? 22 : 3.5, hl: sdDraw.tool === 'hl', p: [p] };
-    e.preventDefault();
-}
-function sdOnMove(e) {
-    if (!sdDraw.drawing) return;
-    const p = sdPoint(e);
-    if (sdDraw.tool === 'eraser') sdEraseAt(p);
-    else if (sdDraw.cur) { sdDraw.cur.p.push(p); sdRedraw(); }
-    e.preventDefault();
-}
-function sdOnUp() {
-    if (!sdDraw.drawing) return; sdDraw.drawing = false;
-    if (sdDraw.cur) { sdDraw.strokes.push(sdDraw.cur); sdDraw.cur = null; }
-    sdSaveStrokes(); sdRedraw();
-}
-function sdSetTool(tool, color) {
-    sdDraw.tool = tool; if (color) sdDraw.color = color;
-    document.querySelectorAll('.sd-pen-color').forEach(b => b.classList.toggle('sel', b.dataset.tool === tool && b.dataset.color === sdDraw.color));
-    const er = document.getElementById('sdEraserBtn'); if (er) er.classList.toggle('on', tool === 'eraser');
-}
-function sdTogglePen() {
-    sdDraw.penMode = !sdDraw.penMode;
-    const bar = document.getElementById('sdPenBar');
-    const vp = document.getElementById('sdViewport');
-    const tgl = document.getElementById('sdPenToggle');
-    if (bar) bar.classList.toggle('active', sdDraw.penMode);
-    if (vp) vp.classList.toggle('sd-pen', sdDraw.penMode);
-    if (tgl) tgl.classList.toggle('on', sdDraw.penMode);
-}
-function sdClearAll() {
-    if (!sdDraw.strokes.length) return;
-    sdDraw.strokes = []; sdSaveStrokes(); sdRedraw();
-}
-function sdUndo() { if (sdDraw.strokes.length) { sdDraw.strokes.pop(); sdSaveStrokes(); sdRedraw(); } }
-// 대본 뷰어 열 때 필기 캔버스+툴바 준비
+// ===== [신규] 대본 필기 = 암송 외우기 엔진 그대로 재사용(같은 플로팅 툴바·펜·형광펜·테이프·지우개·되돌리기) =====
+// 대본 뷰어를 열 때 호출 — 대본 전용 캔버스를 만들고 study 드로잉 엔진(onDrawDown/Move/Up)에 연결
 function sdSetupDrawing(day) {
-    sdLoadStrokes(day);
+    window.__sdDay = day;
     const row = document.getElementById('sdFitRow');
-    if (row && !document.getElementById('sdCanvas')) {
+    if (row && !document.getElementById('sdDrawCanvas')) {
         const cv = document.createElement('canvas');
-        cv.id = 'sdCanvas';
-        cv.addEventListener('pointerdown', sdOnDown);
-        cv.addEventListener('pointermove', sdOnMove);
-        cv.addEventListener('pointerup', sdOnUp);
-        cv.addEventListener('pointercancel', sdOnUp);
+        cv.id = 'sdDrawCanvas';
+        cv.addEventListener('pointerdown', onDrawDown);
+        cv.addEventListener('pointermove', onDrawMove);
+        cv.addEventListener('pointerup', onDrawUp);
+        cv.addEventListener('pointercancel', onDrawUp);
         row.appendChild(cv);
     }
-    // 툴바(1회 생성, body 직속)
-    let bar = document.getElementById('sdPenBar');
-    if (!bar) {
-        bar = document.createElement('div');
-        bar.id = 'sdPenBar'; bar.className = 'sd-penbar';
-        bar.innerHTML =
-            '<button id="sdPenToggle" onclick="sdTogglePen()">✏️ 필기</button>' +
-            '<div class="sd-pen-tools">' +
-            '<button class="sd-pen-color" data-tool="pen" data-color="#1a1a1a" style="background:#1a1a1a" onclick="sdSetTool(\'pen\',\'#1a1a1a\')"></button>' +
-            '<button class="sd-pen-color" data-tool="pen" data-color="#e74c3c" style="background:#e74c3c" onclick="sdSetTool(\'pen\',\'#e74c3c\')"></button>' +
-            '<button class="sd-pen-color" data-tool="pen" data-color="#2563eb" style="background:#2563eb" onclick="sdSetTool(\'pen\',\'#2563eb\')"></button>' +
-            '<button class="sd-pen-color" data-tool="hl" data-color="#f1c40f" style="background:#f7e17a" onclick="sdSetTool(\'hl\',\'#f1c40f\')"></button>' +
-            '<span class="sd-pen-div"></span>' +
-            '<button id="sdEraserBtn" onclick="sdSetTool(\'eraser\')">지우개</button>' +
-            '<button onclick="sdUndo()">되돌리기</button>' +
-            '<button onclick="sdClearAll()">전체지우기</button>' +
-            '</div>';
-        document.body.appendChild(bar);
+    const cv = document.getElementById('sdDrawCanvas');
+    if (cv) {
+        drawCanvas = cv;                       // study 엔진이 쓰는 전역 캔버스를 대본 것으로
+        drawKeyName = currentDrawKey();        // draw_script_{day}
+        strokes = loadStrokes(drawKeyName);
+        editLog = []; editFuture = []; curStroke = null; isDrawing = false;
     }
-    bar.style.display = 'flex';
-    // 상태 초기화(읽기 모드로 시작)
-    sdDraw.penMode = false;
-    bar.classList.remove('active');
-    document.getElementById('sdPenToggle').classList.remove('on');
-    sdSetTool(sdDraw.tool, sdDraw.color);
+    updateFloatingUI(true, 'plowing');         // 암송 외우기와 동일한 필기 툴바(오답체크만 숨김)
+    sdSetupZoomCtl();
+    const zc = document.getElementById('sdZoomCtl'); if (zc) zc.style.display = 'flex';
 }
 function sdHideToolbar() {
-    const bar = document.getElementById('sdPenBar'); if (bar) bar.style.display = 'none';
-    sdDraw.penMode = false;
-    const vp = document.getElementById('sdViewport'); if (vp) vp.classList.remove('sd-pen');
+    updateFloatingUI(false);
+    const zc = document.getElementById('sdZoomCtl'); if (zc) zc.style.display = 'none';
+}
+// ── 대본 확대/축소 + 자물쇠(암송 외우기와 동일 UX, transform 기반) ──
+let sdUserZoom = 1, sdZoomLocked = false, sdPanX = 0, sdPanY = 0;
+function sdLoadZoom() { sdZoomLocked = false; try { const s = JSON.parse(localStorage.getItem('sdZoom')); if (s && typeof s.zoom === 'number' && s.zoom >= 1) sdUserZoom = s.zoom; } catch (e) {} }
+function sdSaveZoom() { try { localStorage.setItem('sdZoom', JSON.stringify({ zoom: sdUserZoom })); } catch (e) {} }
+function sdUpdateZoomBadge() {
+    const pct = document.getElementById('sdZoomPct'); if (pct) pct.textContent = Math.round(sdUserZoom * 100) + '%';
+    const zc = document.getElementById('sdZoomCtl'); if (zc) zc.classList.toggle('zlocked', sdZoomLocked);
+    const lk = document.getElementById('sdZoomLock'); if (lk) { lk.classList.toggle('locked', sdZoomLocked); lk.innerHTML = sdZoomLocked ? LOCK_CLOSED_SVG : LOCK_OPEN_SVG; }
+}
+function sdZoomBy(delta) {
+    if (sdZoomLocked) { sdUpdateZoomBadge(); return; }
+    sdUserZoom = Math.min(3, Math.max(1, +(sdUserZoom + delta).toFixed(2)));
+    if (sdUserZoom === 1) { sdPanX = 0; sdPanY = 0; }
+    sdSaveZoom(); fitScriptToScreen();
+}
+function sdToggleZoomLock() { sdZoomLocked = !sdZoomLocked; sdUpdateZoomBadge(); }
+function sdSetupZoomCtl() {
+    if (!document.getElementById('sdZoomCtl')) {
+        const zc = document.createElement('div'); zc.id = 'sdZoomCtl';
+        zc.innerHTML = '<button class="szc-btn zoombtn" onclick="sdZoomBy(-0.1)" aria-label="축소">−</button>'
+            + '<span class="szc-pct" id="sdZoomPct">100%</span>'
+            + '<button class="szc-btn zoombtn" onclick="sdZoomBy(0.1)" aria-label="확대">+</button>'
+            + '<button class="szc-btn szc-lock" id="sdZoomLock" onclick="sdToggleZoomLock()" aria-label="고정"></button>';
+        document.body.appendChild(zc);
+    }
+    sdLoadZoom(); sdUpdateZoomBadge();
 }
 function openScriptViewer(index) {
     // PC 화면(가로 768 초과)일 때 인덱스가 홀수(오른쪽 페이지)라면 짝수(왼쪽 페이지)로 강제 정렬
