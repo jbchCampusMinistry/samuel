@@ -4149,7 +4149,51 @@ function saveVerseStyle(bodyEl, ref) {
     updateSidebarContent();
 }
 
-/* [신규] 지우개가 지나간 자리의 텍스트 형광펜/밑줄을 제거(언랩) */
+/* [신규] 지우개가 지나간 자리 안의 글자만 부분 지우기 — 지나가지 않은 글자는 형광펜/밑줄 그대로 유지.
+   span이 순수 텍스트만 담고 있을 때만 지원(중첩 태그가 있으면 안전하게 포기 → 호출부에서 통째로 언랩으로 폴백).
+   반환값: true(일부만 벗김) / 'all'(전부 지나감 → 통째로 지워도 됨) / false(부분 처리 불가) */
+function erasePartialTextSpan(span, path, r) {
+    const kids = span.childNodes;
+    if (kids.length !== 1 || kids[0].nodeType !== 3) return false;
+    const textNode = kids[0];
+    const text = textNode.data;
+    if (!text.length) return false;
+    const rect = drawCanvas.getBoundingClientRect();
+    const touched = new Array(text.length).fill(false);
+    let any = false;
+    for (let i = 0; i < text.length; i++) {
+        const rg = document.createRange();
+        rg.setStart(textNode, i); rg.setEnd(textNode, i + 1);
+        const rects = rg.getClientRects();
+        if (!rects.length) continue;
+        const cr = rects[0];
+        const cx = cr.left + cr.width / 2 - rect.left, cy = cr.top + cr.height / 2 - rect.top;
+        for (const p of path) {
+            if (Math.hypot(p[0] - cx, p[1] - cy) <= r) { touched[i] = true; any = true; break; }
+        }
+    }
+    if (!any) return false;
+    if (touched.every(Boolean)) return 'all';
+    // 지워짐/유지 구간으로 나눠 재구성: 유지 구간은 같은 스타일의 새 span, 지워진 구간은 평문
+    const frag = document.createDocumentFragment();
+    let i = 0;
+    while (i < text.length) {
+        let j = i; const state = touched[i];
+        while (j < text.length && touched[j] === state) j++;
+        const chunk = text.slice(i, j);
+        if (state) { frag.appendChild(document.createTextNode(chunk)); }
+        else {
+            const ns = document.createElement('span');
+            ns.className = span.className; ns.style.cssText = span.style.cssText;
+            ns.textContent = chunk;
+            frag.appendChild(ns);
+        }
+        i = j;
+    }
+    span.replaceWith(frag);
+    return true;
+}
+/* [신규] 지우개가 지나간 자리의 텍스트 형광펜/밑줄을 제거 — '부분 지우기' 모드면 닿은 글자만, '획 지우기' 모드면 통째로 */
 function tryEraseTextAnnotations(path) {
     if (!drawCanvas || !path || !path.length) return false;
     const sa = document.getElementById('studyArea');
@@ -4166,16 +4210,25 @@ function tryEraseTextAnnotations(path) {
     }
     drawCanvas.style.pointerEvents = prevPE;
     if (!targets.size) return false;
+    const partial = settings.eraser.mode === 'partial';
+    const r = settings.eraser.width || 13;
     const verses = new Map(); // verse-body-text → ref
     targets.forEach(span => {
         const vb = span.closest('.verse-body-text');
         const vi = vb && vb.closest('.study-verse-item');
         const ref = vi && vi.getAttribute('data-ref');
         if (!vb || !ref) return;
+        let handled = false;
+        if (partial) {
+            const res = erasePartialTextSpan(span, path, r);
+            handled = res === true; // 'all'/false면 아래에서 통째로 언랩
+        }
+        if (!handled) {
+            const parent = span.parentNode;
+            while (span.firstChild) parent.insertBefore(span.firstChild, span);
+            parent.removeChild(span);
+        }
         if (!verses.has(vb)) verses.set(vb, ref);
-        const parent = span.parentNode;
-        while (span.firstChild) parent.insertBefore(span.firstChild, span);
-        parent.removeChild(span);
     });
     verses.forEach((ref, vb) => { vb.normalize(); saveVerseStyle(vb, ref); });
     return true;
