@@ -1295,11 +1295,15 @@ function coachRun(key, steps, opts) {
     const hole = document.createElement('div'); hole.className = 'coach-hole';
     const pop = document.createElement('div'); pop.className = 'coach-pop';
     ov.appendChild(hole); ov.appendChild(pop); document.body.appendChild(ov);
+    document.body.classList.add('coach-active'); // 안내 중엔 헤더/푸터 전환 애니메이션 끔 → 스포트라이트 위치 정확
     let i = 0;
     const elOf = s => { try { return typeof s.el === 'function' ? s.el() : (s.el ? document.querySelector(s.el) : null); } catch(e){ return null; } };
+    const leave = () => { const s = list[i]; if (s && s.after) { try { s.after(); } catch(e){} } }; // 스텝 벗어날 때 정리(예: 상단바 다시 숨김)
     function finish(optout){
+        leave();
         if (optout) { try { localStorage.setItem('coach_optout', '1'); } catch(e){} }
         __coachDone(key); if (ov.parentNode) ov.remove(); __coachActive = false;
+        document.body.classList.remove('coach-active', 'reveal-top', 'sd-reveal-top'); // 안전 정리
         window.removeEventListener('resize', reflow);
     }
     function positionPop(r){
@@ -1341,12 +1345,12 @@ function coachRun(key, steps, opts) {
         const b = e.target.closest('[data-act]');
         if (b) {
             const a = b.getAttribute('data-act');
-            if (a === 'next') { if (i >= list.length - 1) finish(false); else { i++; render(); } }
-            else if (a === 'prev') { if (i > 0) { i--; render(); } }
+            if (a === 'next') { if (i >= list.length - 1) finish(false); else { leave(); i++; render(); } }
+            else if (a === 'prev') { if (i > 0) { leave(); i--; render(); } }
             else if (a === 'skip') { finish(!!opts.optoutOnSkip); }
             return;
         }
-        if (!e.target.closest('.coach-pop')) { if (i >= list.length - 1) finish(false); else { i++; render(); } }
+        if (!e.target.closest('.coach-pop')) { if (i >= list.length - 1) finish(false); else { leave(); i++; render(); } }
     });
     window.addEventListener('resize', reflow);
     render();
@@ -1354,16 +1358,16 @@ function coachRun(key, steps, opts) {
 function coachStepsHome(){ return [
     { el: null, title: '사무엘학교가 처음이신가요?', body: '주요 기능을 하나씩 짧게 알려드릴게요. 언제든 건너뛸 수 있어요.', skipLabel: '괜찮아요' },
     { el: '#authBtn', title: '로그인 · 내 계정', body: '여기로 <b>구글 로그인</b>하면 진도·기록이 저장되고, 기기를 바꿔도 그대로 유지돼요. 로그인한 뒤 이 아이콘을 누르면 <b>마이페이지·로그아웃</b> 메뉴가 열려요.' },
-    { el: () => document.querySelector('[onclick*="toggleSidebar"]'), title: '암송 도우미', body: '☰를 누르면 <b>암송 도우미</b>가 열려요. 그 <b>제목줄을 끌면</b> 창처럼 자유롭게 옮기고, <b>오른쪽 아래 모서리</b>로 크기도 조절할 수 있어요.' },
+    { el: '#globalHeader [onclick*="toggleSidebar"]', title: '암송 도우미', body: '왼쪽 위 <b>☰</b>를 누르면 <b>암송 도우미</b>가 열려요. 그 <b>제목줄을 끌면</b> 창처럼 자유롭게 옮기고, <b>오른쪽 아래 모서리</b>로 크기도 조절할 수 있어요.' },
 ]; }
 function coachStepsStudy(){ return [
-    { el: null, title: '몰입 모드', body: '암송 화면은 위·아래 메뉴가 숨어 본문에 집중돼요. <b>화면을 위로 살짝 쓸어올리면</b> 상단 메뉴(◀ 뒤로가기)가 잠깐 나타나요.' },
+    { el: '#globalHeader', before: () => { try { clearTimeout(chromeRevealTimer); } catch(e){} document.body.classList.add('reveal-top'); }, after: () => document.body.classList.remove('reveal-top'), title: '몰입 모드 · 상단 메뉴', body: '암송 화면은 위·아래 메뉴가 숨어 본문에 집중돼요. <b>화면을 위로 살짝 쓸어올리면</b> 지금처럼 <b>상단 메뉴(◀ 뒤로가기)</b>가 나타나요.' },
     { el: '#studyZoomCtl', before: () => { try { if (typeof showZoomCtl === 'function') showZoomCtl(); } catch(e){} }, title: '확대 · 고정', body: '<b>−/＋</b>로 크게 볼 수 있어요. (노트북은 <b>Ctrl+휠</b>, 태블릿은 <b>두 손가락</b>) <b>자물쇠🔒</b>를 누르면 지금 크기로 고정돼요.' },
     { el: '.ft-wrong', title: '오답 체크', body: '켜면 예전에 <b>틀렸던 부분이 빨갛게</b> 표시돼서 약한 곳을 집중 연습할 수 있어요.' },
     { el: '#flexToolbar', title: '필기 도구', body: '펜·형광펜 색을 <b>한 번 더 누르면</b> 굵기·색 옵션이 열려요. <b>글자 위에 그으면</b> 자동으로 형광펜/밑줄로 바뀌고, <b>가림 테이프</b>로 덮은 뒤 <b>탭하면 가렸다/보였다</b> 전환돼요.' },
 ]; }
 function coachStepsScript(){ return [
-    { el: null, title: '대본 닫기', body: '대본은 닫기 버튼이 따로 없어요. <b>화면을 위로 쓸어올리면</b> 상단 메뉴가 나타나고 <b>◀ 뒤로가기</b>로 나가요. (좌우로 넘기면 이전/다음 일차)' },
+    { el: '#globalHeader', before: () => { try { clearTimeout(__sdRevealTimer); } catch(e){} document.body.classList.add('sd-reveal-top'); }, after: () => document.body.classList.remove('sd-reveal-top'), title: '대본 닫기 · 상단 메뉴', body: '대본은 닫기 버튼이 따로 없어요. <b>화면을 위로 쓸어올리면</b> 지금처럼 <b>상단 메뉴</b>가 나타나고 <b>◀ 뒤로가기</b>로 나가요. (좌우로 넘기면 이전/다음 일차)' },
     { el: () => document.getElementById('sdZoomCtl'), title: '확대 · 고정', body: '오른쪽 아래 <b>−/＋</b>로 확대해요. 노트북은 <b>Ctrl+휠</b>, 태블릿은 <b>두 손가락</b>. <b>자물쇠</b>로 배율을 고정할 수 있어요.' },
     { el: '#flexToolbar', title: '대본에도 필기', body: '암송과 똑같이 펜·형광펜·<b>가림 테이프</b>로 필기할 수 있어요. 색을 한 번 더 누르면 옵션이 열려요.' },
 ]; }
