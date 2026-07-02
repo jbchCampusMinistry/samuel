@@ -3543,10 +3543,12 @@ function applyStrokeStyle(s) {
 
 // [가림 테이프] 그은 궤적의 바깥 사각형(+두께) — 이 영역을 통째로 불투명하게 채워 글자를 모두 가림
 function tapeBox(s) {
-    const p = s.p, half = (s.w || 26) / 2;
+    // 높이는 '굵기(w)'로 고정 — 그은 궤적의 세로 흔들림과 무관하게 일정한 높이의 가로 막대로 덮음
+    const p = s.p, w = (s.w || 26), half = w / 2;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const q of p) { if (q[0] < minX) minX = q[0]; if (q[0] > maxX) maxX = q[0]; if (q[1] < minY) minY = q[1]; if (q[1] > maxY) maxY = q[1]; }
-    return { x: minX - half, y: minY - half, w: (maxX - minX) + s.w, h: (maxY - minY) + s.w };
+    const midY = (minY + maxY) / 2; // 세로 위치 = 궤적 중앙
+    return { x: minX - half, y: midY - half, w: (maxX - minX) + w, h: w };
 }
 function strokePath(s) {
     const ctx = drawCtx, p = s.p;
@@ -5128,10 +5130,24 @@ function mergeScriptPages(dayHtml) {
     return '<div class="sd-page">' + inner + '</div>';
 }
 // [신규] 대본 제스처: (확대 X) 좌우 스와이프=이전/다음 일차 · (확대 O) 드래그=이동(팬) · 두 손가락=핀치 확대
+// [대본] 위/아래로 스크롤(휠·드래그)하면 상단 헤더/하단 푸터 배너가 잠깐 슬라이드로 나타남(암송 외우기처럼)
+let __sdRevealTimer = null;
+function sdRevealChrome(which) {
+    if (!document.body.classList.contains('sd-open')) return;
+    document.body.classList.remove('sd-reveal-top', 'sd-reveal-bottom');
+    document.body.classList.add(which === 'bottom' ? 'sd-reveal-bottom' : 'sd-reveal-top');
+    clearTimeout(__sdRevealTimer);
+    __sdRevealTimer = setTimeout(() => { document.body.classList.remove('sd-reveal-top', 'sd-reveal-bottom'); }, 2400);
+}
 function initScriptSwipe(day) {
     const vp = document.getElementById('sdViewport');
     if (!vp) return;
     let sx = 0, sy = 0, tracking = false, panned = false;
+    // 노트북: Ctrl+휠(트랙패드 핀치 포함)=확대/축소, 일반 휠 위/아래=상·하단 배너 표시
+    vp.addEventListener('wheel', e => {
+        if (e.ctrlKey) { e.preventDefault(); sdZoomBy(e.deltaY < 0 ? 0.12 : -0.12); }
+        else { sdRevealChrome(e.deltaY < 0 ? 'top' : 'bottom'); }
+    }, { passive: false });
     const pts = new Map(); let pinch0 = null, zoom0 = 1;
     const goNext = () => { if (day < 6) openScriptViewer(day * 2); };
     const goPrev = () => { if (day > 1) openScriptViewer((day - 2) * 2); };
@@ -5171,9 +5187,10 @@ function initScriptSwipe(day) {
         pts.delete(e.pointerId);
         if (pts.size < 2) { pinch0 = null; sdSaveZoom(); }
         if (!tracking) return; tracking = false;
-        if (sdUserZoom > 1 || panned) return; // 확대 중엔 일차 이동 안 함
+        if (sdUserZoom > 1 || panned) return; // 확대 중엔 일차 이동/배너 안 함(드래그=팬)
         const dx = e.clientX - sx, dy = e.clientY - sy;
         if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.4) { if (dx < 0) goNext(); else goPrev(); }
+        else if (Math.abs(dy) > 45 && Math.abs(dy) > Math.abs(dx) * 1.2) { sdRevealChrome(dy > 0 ? 'top' : 'bottom'); } // 아래로 끌면 상단, 위로 끌면 하단 배너
     };
     vp.addEventListener('pointerup', end);
     vp.addEventListener('pointercancel', end);
@@ -5240,8 +5257,7 @@ function sdSetupZoomCtl() {
 function openScriptViewer(index) {
     currentScriptIndex = index;
 
-    document.getElementById('globalHeader').classList.add('header-hidden');
-    document.querySelector('.app-footer').classList.add('footer-hidden');
+    // 헤더/푸터는 display:none이 아니라 sd-open의 translateY로 숨김 → 위/아래 스크롤 시 슬라이드로 다시 나타남(암송 외우기처럼)
     document.querySelectorAll('.main-container .container').forEach(div => div.style.display = 'none');
     // 암송(study-immersive) 제스처 모듈과 충돌하지 않도록 study 몰입 클래스는 해제하고 대본 전용 sd-open 사용
     document.body.classList.remove('study-immersive', 'reveal-top', 'reveal-bottom', 'study-zoomscroll');
@@ -5260,7 +5276,6 @@ function openScriptViewer(index) {
             <div class="sd-topbar-actions">
                 <button onclick="openDayStudy(${day})" title="이 일차 암송 보기">📖 암송</button>
                 ${prevBtn}${nextBtn}
-                <button class="sd-close" onclick="goBack()">✖ 닫기</button>
             </div>
         </div>
         <div class="sd-viewport" id="sdViewport"><div class="sd-fitrow" id="sdFitRow"><div class="sd-page sd-imgpage"><img id="sdDaeImg" src="day${day}.webp" alt="${day}일차 대본" draggable="false" /></div></div></div>

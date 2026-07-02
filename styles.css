@@ -781,7 +781,7 @@
     input:checked + .toggle-slider { background-color: var(--primary); }
     input:checked + .toggle-slider:before { transform: translateX(18px); }
 
-    .color-grid { display: flex; gap: 8px; justify-content: center; align-items: center; }
+    .color-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; min-width: 0; }
     /* 펜 옵션 색 줄: 박스 안에서 줄바꿈되게(넘침 방지) */
     .opt-color-row { align-items: center; }
     #opt-colors { flex: 1; flex-wrap: wrap; justify-content: flex-end; gap: 7px; min-width: 0; }
@@ -1283,7 +1283,10 @@
         display: flex; align-items: center; justify-content: space-between;
         padding: 10px 12px; z-index: 3020;
         background: transparent; border: none; pointer-events: none;
+        transition: transform .28s ease;
     }
+    /* 상단 헤더 배너가 내려오면 대본 플로팅 알약도 그 아래로 밀어 겹치지 않게(암송 외우기와 동일) */
+    body.sd-open.sd-reveal-top .sd-topbar { transform: translateY(62px); }
     .sd-topbar-title {
         font-weight: 800; color: #1f2a37; font-size: 0.9rem;
         background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 999px;
@@ -1314,8 +1317,10 @@
     body.sd-open #globalHeader { position: fixed; top: 0; left: 0; right: 0; transform: translateY(-100%); transition: transform .28s ease; z-index: 3000; will-change: transform; }
     body.sd-open .app-footer { position: fixed; bottom: 0; left: 0; right: 0; transform: translateY(100%); transition: transform .28s ease; z-index: 3000; }
     body.sd-open.sd-reveal-top #globalHeader { transform: translateY(0); }
+    body.sd-open.sd-reveal-bottom .app-footer { transform: translateY(0); }
     body.sd-open #scrollContent { overflow: hidden; justify-content: safe center; padding: 0; touch-action: none; }
     body.sd-open #stepScriptViewer.paper-view-container {
+        position: relative; inset: auto; z-index: auto;  /* 구 오버레이(fixed z3000) 무력화 → 인플로우라 헤더가 위로 슬라이드 가능 */
         flex: 1 1 auto; align-self: stretch; width: 100%; height: 100%;
         min-height: 0; padding: 0 !important; margin: 0; background: #eef1f5;
     }
