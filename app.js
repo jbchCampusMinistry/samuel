@@ -839,7 +839,11 @@ function onStudyChromeWheel(e) {
     if (sc.scrollTop <= 2 && e.deltaY < -4) revealChrome('top');
 }
 // 첫 사용자 동작에서 자동으로 전체화면 시도(브라우저 정책상 제스처 필요). iOS Safari는 미지원 → 홈화면 추가 권장.
+// [수정] 노트북·데스크톱(마우스/트랙패드=고운 포인터)에서는 자동 전체화면 안 함 → 사용자가 우상단 ⛶ 버튼으로 직접 전환.
+//        모바일/태블릿(터치, 고운 포인터 없음)에서만 첫 동작에서 자동 전체화면(주소창 숨겨 몰입).
 function armAutoFullscreen() {
+    const hasFinePointer = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+    if (hasFinePointer) return; // 노트북/데스크톱은 자동 전체화면 안 함
     const once = () => {
         document.removeEventListener('pointerdown', once);
         document.removeEventListener('click', once);
