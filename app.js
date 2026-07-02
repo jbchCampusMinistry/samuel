@@ -765,6 +765,7 @@ function updateFloatingUI(show, context = 'default') {
         isPenModeActive = false;
         toolbar.classList.remove('active', 'plowing-mode');
         toolbar.style.display = 'none';
+        resetToolbarPos(); // 화면을 나가면 위치 기억을 지움 → 다음에 열 때 항상 기본(상단 중앙)에서 시작
         closeAllPopups();
         closeExpandedPalette();
         if (typeof drawCanvas !== 'undefined' && drawCanvas) drawCanvas.classList.remove('draw-active');
@@ -2649,14 +2650,17 @@ function applySidebarLayout() {
 window.addEventListener('resize', clampSidebarPos);
 
 // ============================================================
-// [신규] 필기 툴바 드래그 이동 + 위치 저장 (기본 좌측 하단)
+// [신규] 필기 툴바 드래그 이동 (기본 상단 중앙 · 화면을 나갔다 들어오면 기본 위치로 복귀)
+// 위치를 localStorage에 영구 저장하지 않음 — 보고 있는 동안(일차를 넘겨도)만 옮긴 자리를 유지하고,
+// 화면을 완전히 나갔다(뒤로가기·홈 등) 다시 들어오면 항상 상단 중앙 기본 위치에서 시작한다.
 // ============================================================
-const TOOLBAR_POS_KEY = 'toolbarPos';
+let sessionToolbarPos = null;
 function saveToolbarPos() {
     const tb = document.getElementById('flexToolbar');
     if (!tb || !tb.style.left || !tb.style.top) return;
-    try { localStorage.setItem(TOOLBAR_POS_KEY, JSON.stringify({ left: parseInt(tb.style.left) || 0, top: parseInt(tb.style.top) || 0 })); } catch (e) {}
+    sessionToolbarPos = { left: parseInt(tb.style.left) || 0, top: parseInt(tb.style.top) || 0 };
 }
+function resetToolbarPos() { sessionToolbarPos = null; }
 // 상단 헤더(배너) 높이 + 여백 → 툴바·네비가 이 위로 못 올라오게 하는 안전선
 function topSafeInset() {
     const gh = document.getElementById('globalHeader');
@@ -2688,12 +2692,16 @@ function applySavedToolbarPos() {
     tb.classList.toggle('minimized', min); // 최소화 상태 복원
     const minBtn = document.getElementById('ftMinBtn');
     if (minBtn) minBtn.title = min ? '툴바 펼치기' : '툴바 최소화';
-    let p = null; try { p = JSON.parse(localStorage.getItem(TOOLBAR_POS_KEY)); } catch (e) {}
-    if (p && typeof p.left === 'number') {
-        tb.style.bottom = 'auto'; tb.style.right = 'auto';
-        tb.style.left = p.left + 'px'; tb.style.top = p.top + 'px';
-        clampToolbarPos();
+    tb.style.bottom = 'auto'; tb.style.right = 'auto';
+    if (sessionToolbarPos) {
+        // 이번에 열려 있는 동안 사용자가 옮겨 둔 자리 그대로 유지(일차를 넘겨도 유지)
+        tb.style.left = sessionToolbarPos.left + 'px'; tb.style.top = sessionToolbarPos.top + 'px';
+    } else {
+        // 기본 위치: 화면 위쪽 중앙
+        tb.style.top = topSafeInset() + 'px';
+        tb.style.left = Math.round((window.innerWidth - tb.offsetWidth) / 2) + 'px';
     }
+    clampToolbarPos();
 }
 function toggleToolbarOrientation() {
     const tb = document.getElementById('flexToolbar');
