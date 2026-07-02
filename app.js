@@ -4738,7 +4738,7 @@ const scriptHtmlData = {
           <div class="sd-item">진짜 '나'는 육체가 아니고 영혼이며, 죽음 이후에 하나님을 만남<span class="sd-ref">전 12:7</span></div>
           <div class="sd-item">임사체험 사례를 통해서 영혼의 존재를 확신할 수 있음</div>
         </div></div>
-        <div class="sd-branch"><div class="sd-branch-label">영생<small>인생의 목적</small></div><div class="sd-branch-body">
+        <div class="sd-branch"><div class="sd-branch-label"><small>인생의 목적</small>영생</div><div class="sd-branch-body">
           <div class="sd-item">사람에게 영혼이 있으므로, 인생의 목적은 영생을 얻는 것<span class="sd-ref">전 3:1</span></div>
           <div class="sd-item">사람은 영원을 사모하는 마음이 있으므로, 외적인 조건이 충족되어도 만족이 없음<span class="sd-ref">전 3:11</span></div>
           <div class="sd-item">죽음이 끝이 아니고 영원한 세계가 있으므로, 천국에 가기 위해 거듭나야 함<span class="sd-ref">요 3:3</span></div>
@@ -5454,6 +5454,11 @@ function openScriptViewer(index) {
 
     const prevBtn = day > 1 ? `<button onclick="openScriptViewer(${(day-2)*2})">◀ ${day-1}일차</button>` : '';
     const nextBtn = day < 6 ? `<button onclick="openScriptViewer(${day*2})">${day+1}일차 ▶</button>` : '';
+    // [신규] 선명한 텍스트/도표로 재현된 일차는 흐릿한 이미지 대신 HTML로 렌더(현재는 1일차만 적용, 나머지는 기존 이미지 유지)
+    const useHtml = day === 1 && typeof scriptHtmlData !== 'undefined' && scriptHtmlData[day];
+    const pageHtml = useHtml
+        ? mergeScriptPages(scriptHtmlData[day])
+        : `<div class="sd-page sd-imgpage"><img id="sdDaeImg" src="day${day}.webp" alt="${day}일차 대본" draggable="false" /></div>`;
     const htmlDoc = `
         <div class="sd-topbar no-print">
             <div class="sd-topbar-title">${day}일차 대본</div>
@@ -5462,7 +5467,7 @@ function openScriptViewer(index) {
                 ${prevBtn}${nextBtn}
             </div>
         </div>
-        <div class="sd-viewport" id="sdViewport"><div class="sd-fitrow" id="sdFitRow"><div class="sd-page sd-imgpage"><img id="sdDaeImg" src="day${day}.webp" alt="${day}일차 대본" draggable="false" /></div></div></div>
+        <div class="sd-viewport" id="sdViewport"><div class="sd-fitrow" id="sdFitRow">${pageHtml}</div></div>
     `;
     document.getElementById('scriptDetailContent').innerHTML = htmlDoc;
     document.getElementById('stepScriptViewer').style.display = 'block';
